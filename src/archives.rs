@@ -5,7 +5,8 @@ use rand::{thread_rng, Rng};
 use std::error::Error;
 use std::fs::File;
 use std::io::Write;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::str::from_utf8;
 use tempdir::TempDir;
 
@@ -29,6 +30,15 @@ pub fn extract_objects(archives: &[PathBuf]) -> Result<ObjectTempDir, Box<dyn Er
     }
 
     Ok(ObjectTempDir { dir, objects })
+}
+
+pub fn create_index(archive_path: &Path) -> Result<(), Box<dyn Error>> {
+    Command::new("ranlib")
+        .args(vec![archive_path])
+        .status()
+        .expect("Failed to create archive index with `ranlib`");
+
+    Ok(())
 }
 
 pub fn merge<T: Write>(mut output: Builder<T>, archives: &[PathBuf]) -> Result<(), Box<dyn Error>> {
