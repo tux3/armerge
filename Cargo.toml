@@ -1,0 +1,11 @@
+[package]
+name = "armerge"
+version = "1.0.0"
+authors = ["tux3 <barrdetwix@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+structopt = "0.3"
+ar = "0.8"
+tempdir = "0.3.7"
+rand = "0.7.3"
