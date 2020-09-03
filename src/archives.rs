@@ -1,12 +1,11 @@
+use crate::arbuilder::ArBuilder;
 use crate::objects::ObjectTempDir;
-use ar::{Archive, Builder};
+use ar::Archive;
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
 use std::error::Error;
 use std::fs::File;
-use std::io::Write;
-use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::path::PathBuf;
 use std::str::from_utf8;
 use tempdir::TempDir;
 
@@ -32,7 +31,10 @@ pub fn extract_objects(archives: &[PathBuf]) -> Result<ObjectTempDir, Box<dyn Er
     Ok(ObjectTempDir { dir, objects })
 }
 
-pub fn create_index(archive_path: &Path) -> Result<(), Box<dyn Error>> {
+#[cfg(not(target_os = "macos"))]
+pub fn create_index(archive_path: &std::path::Path) -> Result<(), Box<dyn Error>> {
+    use std::process::Command;
+
     Command::new("ranlib")
         .args(vec![archive_path])
         .status()
@@ -41,14 +43,13 @@ pub fn create_index(archive_path: &Path) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-pub fn merge<T: Write>(mut output: Builder<T>, archives: &[PathBuf]) -> Result<(), Box<dyn Error>> {
-    for archive_path in archives {
-        let mut archive = Archive::new(File::open(archive_path)?);
-        while let Some(entry_result) = archive.next_entry() {
-            let mut entry = entry_result?;
-            let header = entry.header().clone();
-            output.append(&header, &mut entry)?;
-        }
+pub fn merge(mut output: impl ArBuilder, archives: &[PathBuf]) -> Result<(), Box<dyn Error>> {
+    let objects_dir = extract_objects(archives)?;
+
+    for obj_path in objects_dir.objects {
+        output.append_obj(obj_path)?;
     }
+
+    output.close()?;
     Ok(())
 }

@@ -1,12 +1,11 @@
+use crate::arbuilder::ArBuilder;
 use crate::object_syms::ObjectSyms;
-use ar::{Builder, Header};
 use object::{Object, SymbolKind};
 use rayon::prelude::*;
 use regex::Regex;
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::ffi::OsString;
-use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -168,29 +167,48 @@ fn create_filter_list(
     Ok(filter_path)
 }
 
+fn find_objcopy() -> Result<String, Box<dyn Error>> {
+    for objcopy_name in &["objcopy", "gobjcopy"] {
+        if which::which(objcopy_name).is_ok() {
+            return Ok(objcopy_name.to_string());
+        }
+    }
+
+    let brew_gobjcopy = "/usr/local/opt/binutils/bin/gobjcopy";
+    if Path::new(brew_gobjcopy).exists() {
+        return Ok(brew_gobjcopy.to_owned());
+    }
+
+    Err(From::from("Unable to find `objcopy` or `gobjcopy` on your system, please install binutils and update your PATH"))
+}
+
 fn filter_symbols(object_path: &Path, filter_list_path: &Path) -> Result<(), Box<dyn Error>> {
     let args = vec![
         OsString::from("--localize-symbols"),
         filter_list_path.as_os_str().to_owned(),
         object_path.as_os_str().to_owned(),
     ];
-    Command::new("llvm-objcopy")
+    Command::new(find_objcopy()?)
         .args(args)
         .status()
-        .expect("Failed to filter symbols with `llvm-objcopy`");
+        .expect("Failed to filter symbols with objcopy");
 
     Ok(())
 }
 
-pub fn merge<T: Write>(
-    mut output: Builder<T>,
+pub fn merge(
+    mut output: impl ArBuilder,
     objects: ObjectTempDir,
-    keep_regexes: Vec<String>,
+    mut keep_regexes: Vec<String>,
     verbose: bool,
 ) -> Result<(), Box<dyn Error>> {
     let merged_name = "merged.o";
     let mut merged_path = objects.dir.path().to_owned();
     merged_path.push(merged_name);
+
+    // When filtering symbols to keep just the public API visible,
+    // we must make an exception for the personality routines (if linked statically)
+    keep_regexes.push("_?__g.._personality_.*".into());
 
     let keep_regexes = keep_regexes
         .into_iter()
@@ -203,17 +221,8 @@ pub fn merge<T: Write>(
     let filter_path = create_filter_list(&merged_path, &keep_regexes, verbose)?;
     filter_symbols(&merged_path, &filter_path)?;
 
-    let obj = File::open(&merged_path)?;
-    let header = Header::new(
-        merged_path
-            .file_name()
-            .unwrap()
-            .to_string_lossy()
-            .as_bytes()
-            .to_vec(),
-        obj.metadata()?.len(),
-    );
-    output.append(&header, &obj)?;
+    output.append_obj(merged_path)?;
+    output.close()?;
 
     Ok(())
 }

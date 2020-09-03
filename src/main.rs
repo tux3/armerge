@@ -1,10 +1,9 @@
+mod arbuilder;
 mod archives;
 mod object_syms;
 mod objects;
 
-use ar::Builder;
 use std::error::Error;
-use std::fs::File;
 use std::path::PathBuf;
 use structopt::StructOpt;
 
@@ -31,14 +30,13 @@ struct Opt {
 fn main() -> Result<(), Box<dyn Error>> {
     let opt = Opt::from_args();
 
-    let builder = Builder::new(File::create(&opt.output)?);
+    let builder = arbuilder::platform_builder(&opt.output, opt.verbose);
     if opt.keep_symbols.is_empty() {
         archives::merge(builder, &opt.inputs)?;
     } else {
         let objects_dir = archives::extract_objects(&opt.inputs)?;
         objects::merge(builder, objects_dir, opt.keep_symbols, opt.verbose)?;
     }
-    archives::create_index(&opt.output)?;
 
     Ok(())
 }
