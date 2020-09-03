@@ -80,8 +80,40 @@ fn filter_required_objects(
         .collect())
 }
 
+#[cfg(not(target_os = "macos"))]
+fn create_filtered_merged_object(
+    merged_path: &Path,
+    objects: impl IntoIterator<Item = impl AsRef<Path>>,
+    filter_list: &Path,
+    verbose: bool,
+) -> Result<(), Box<dyn Error>> {
+    create_merged_object(&merged_path, &[], objects, verbose)?;
+    filter_symbols(&merged_path, &filter_list)?;
+
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+fn create_filtered_merged_object(
+    merged_path: &Path,
+    objects: impl IntoIterator<Item = impl AsRef<Path>>,
+    filter_list: &Path,
+    verbose: bool,
+) -> Result<(), Box<dyn Error>> {
+    let extra_args = &[
+        "-unexported_symbols_list".to_owned(),
+        filter_list.to_str().unwrap().to_owned(),
+    ];
+    let merged_firstpass_path = merged_path.parent().unwrap().join("merged_firstpass.o");
+    create_merged_object(&merged_firstpass_path, extra_args, objects, verbose)?;
+    create_merged_object(&merged_path, &[], &[&merged_firstpass_path], false)?;
+
+    Ok(())
+}
+
 fn create_merged_object(
     merged_path: &Path,
+    extra_args: &[String],
     objects: impl IntoIterator<Item = impl AsRef<Path>>,
     verbose: bool,
 ) -> Result<(), Box<dyn Error>> {
@@ -96,6 +128,8 @@ fn create_merged_object(
         merged_path.as_os_str().to_owned(),
     ]
     .to_vec();
+    args.extend(extra_args.into_iter().map(OsString::from));
+
     let mut count = 0;
     args.extend(
         objects
@@ -121,33 +155,36 @@ fn create_merged_object(
 }
 
 fn create_filter_list(
-    object_path: &Path,
+    object_dir: &Path,
+    objects: impl IntoIterator<Item = impl AsRef<Path>>,
     keep_regexes: &[Regex],
     verbose: bool,
 ) -> Result<PathBuf, Box<dyn Error>> {
-    let filter_path = object_path.parent().unwrap().join("localize.syms");
+    let filter_path = object_dir.join("localize.syms");
     let mut filter_syms = HashSet::new();
-
-    let data = std::fs::read(object_path)?;
-    let file = object::File::parse(&data)?;
     let mut kept_count = 0;
-    'next_symbol: for (_idx, sym) in file.symbols() {
-        if !sym.is_global()
-            || sym.is_weak()
-            || sym.is_undefined()
-            || (sym.kind() != SymbolKind::Text && sym.kind() != SymbolKind::Data)
-        {
-            continue;
-        }
-        if let Some(name) = sym.name() {
-            for regex in keep_regexes {
-                if regex.is_match(name) {
-                    kept_count += 1;
-                    continue 'next_symbol;
-                }
-            }
 
-            filter_syms.insert(name);
+    for object_path in objects.into_iter() {
+        let data = std::fs::read(object_path)?;
+        let file = object::File::parse(&data)?;
+        'next_symbol: for (_idx, sym) in file.symbols() {
+            if !sym.is_global()
+                || sym.is_weak()
+                || sym.is_undefined()
+                || (sym.kind() != SymbolKind::Text && sym.kind() != SymbolKind::Data)
+            {
+                continue;
+            }
+            if let Some(name) = sym.name() {
+                for regex in keep_regexes {
+                    if regex.is_match(name) {
+                        kept_count += 1;
+                        continue 'next_symbol;
+                    }
+                }
+
+                filter_syms.insert(name.to_owned());
+            }
         }
     }
     if verbose {
@@ -167,28 +204,14 @@ fn create_filter_list(
     Ok(filter_path)
 }
 
-fn find_objcopy() -> Result<String, Box<dyn Error>> {
-    for objcopy_name in &["objcopy", "gobjcopy"] {
-        if which::which(objcopy_name).is_ok() {
-            return Ok(objcopy_name.to_string());
-        }
-    }
-
-    let brew_gobjcopy = "/usr/local/opt/binutils/bin/gobjcopy";
-    if Path::new(brew_gobjcopy).exists() {
-        return Ok(brew_gobjcopy.to_owned());
-    }
-
-    Err(From::from("Unable to find `objcopy` or `gobjcopy` on your system, please install binutils and update your PATH"))
-}
-
+#[cfg(not(target_os = "macos"))]
 fn filter_symbols(object_path: &Path, filter_list_path: &Path) -> Result<(), Box<dyn Error>> {
     let args = vec![
         OsString::from("--localize-symbols"),
         filter_list_path.as_os_str().to_owned(),
         object_path.as_os_str().to_owned(),
     ];
-    Command::new(find_objcopy()?)
+    Command::new("objcopy")
         .args(args)
         .status()
         .expect("Failed to filter symbols with objcopy");
@@ -216,10 +239,14 @@ pub fn merge(
         .collect::<Result<Vec<_>, _>>()?;
 
     let required_objects = filter_required_objects(&objects.objects, &keep_regexes, verbose)?;
-    create_merged_object(&merged_path, required_objects.keys(), verbose)?;
+    let filter_path = create_filter_list(
+        objects.dir.path(),
+        required_objects.keys(),
+        &keep_regexes,
+        verbose,
+    )?;
 
-    let filter_path = create_filter_list(&merged_path, &keep_regexes, verbose)?;
-    filter_symbols(&merged_path, &filter_path)?;
+    create_filtered_merged_object(&merged_path, required_objects.keys(), &filter_path, verbose)?;
 
     output.append_obj(merged_path)?;
     output.close()?;

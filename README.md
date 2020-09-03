@@ -5,7 +5,7 @@ You can use armerge to combine multiple static libraries into a single merged `a
 Optionally, it is possible to generate a static archive containing a single merged object file, where all non-public symbols are localized (hidden).
 
 This tool requires `ranlib`, `ld`, and `objcopy` installed on your host system.  
-On macOS, `libtool`, `ld` and `gobjcopy` are used instead.  
+On macOS, just `libtool` and `ld` are used instead.  
 You may specify a different linker using the `LD` environment variable.
 
 ```
