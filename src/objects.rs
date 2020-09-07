@@ -222,23 +222,23 @@ fn filter_symbols(object_path: &Path, filter_list_path: &Path) -> Result<(), Box
 pub fn merge(
     mut output: impl ArBuilder,
     objects: ObjectTempDir,
-    mut keep_regexes: Vec<String>,
+    keep_regexes: Vec<String>,
     verbose: bool,
 ) -> Result<(), Box<dyn Error>> {
     let merged_name = "merged.o";
     let mut merged_path = objects.dir.path().to_owned();
     merged_path.push(merged_name);
 
-    // When filtering symbols to keep just the public API visible,
-    // we must make an exception for the personality routines (if linked statically)
-    keep_regexes.push("_?__g.._personality_.*".into());
-
-    let keep_regexes = keep_regexes
+    let mut keep_regexes = keep_regexes
         .into_iter()
         .map(|r| Regex::new(&r))
         .collect::<Result<Vec<_>, _>>()?;
 
     let required_objects = filter_required_objects(&objects.objects, &keep_regexes, verbose)?;
+
+    // When filtering symbols to keep just the public API visible,
+    // we must make an exception for the personality routines (if linked statically)
+    keep_regexes.push(Regex::new("_?__g.._personality_.*")?);
     let filter_path = create_filter_list(
         objects.dir.path(),
         required_objects.keys(),
