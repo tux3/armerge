@@ -169,7 +169,6 @@ fn create_filter_list(
         let file = object::File::parse(&data)?;
         'next_symbol: for (_idx, sym) in file.symbols() {
             if !sym.is_global()
-                || sym.is_weak()
                 || sym.is_undefined()
                 || (sym.kind() != SymbolKind::Text && sym.kind() != SymbolKind::Data)
             {
