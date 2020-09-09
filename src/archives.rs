@@ -15,12 +15,22 @@ pub fn extract_objects(archives: &[PathBuf]) -> Result<ObjectTempDir, Box<dyn Er
 
     for archive_path in archives {
         let mut archive = Archive::new(File::open(archive_path)?);
+        let archive_name = archive_path
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .replace('/', "_");
         while let Some(entry_result) = archive.next_entry() {
             let mut entry = entry_result?;
 
             let rnd: String = thread_rng().sample_iter(&Alphanumeric).take(8).collect();
             let mut obj_path = dir.path().to_owned();
-            obj_path.push(from_utf8(entry.header().identifier())?.to_string() + "." + &rnd + ".o");
+            obj_path.push(format!(
+                "{}@{}.{}.o",
+                archive_name,
+                from_utf8(entry.header().identifier())?.to_string(),
+                &rnd
+            ));
 
             let mut file = File::create(&obj_path)?;
             std::io::copy(&mut entry, &mut file).unwrap();
