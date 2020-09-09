@@ -217,6 +217,12 @@ fn filter_symbols(
     filter_list_path: &Path,
     verbose: bool,
 ) -> Result<(), Box<dyn Error>> {
+    let objcopy_path = if let Some(var) = std::env::var_os("OBJCOPY") {
+        var
+    } else {
+        OsString::from_str("objcopy").unwrap()
+    };
+
     let args = vec![
         OsString::from("--localize-symbols"),
         filter_list_path.as_os_str().to_owned(),
@@ -224,14 +230,15 @@ fn filter_symbols(
     ];
     if verbose {
         println!(
-            "objcopy {}",
+            "{} {}",
+            objcopy_path.to_string_lossy(),
             args.iter()
                 .map(|s| s.to_string_lossy())
                 .collect::<Vec<_>>()
                 .join(" ")
         );
     }
-    let status = Command::new("objcopy").args(args).status();
+    let status = Command::new(objcopy_path).args(args).status();
     if let Ok(status) = status {
         if status.success() {
             return Ok(());

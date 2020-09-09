@@ -6,7 +6,7 @@ Optionally, it is possible to generate a static archive containing a single merg
 
 This tool requires `ranlib`, `ld`, and `objcopy` installed on your host system.  
 On macOS, just `libtool` and `ld` are used instead.  
-You may specify a different linker using the `LD` environment variable.
+You may specify a different linker using the `LD` environment variable, and a different objcopy implementation with `OBJCOPY` (for example, llvm-objcopy is much faster in some cases).
 
 ```
 USAGE:
