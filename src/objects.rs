@@ -88,7 +88,7 @@ fn create_filtered_merged_object(
     verbose: bool,
 ) -> Result<(), Box<dyn Error>> {
     create_merged_object(&merged_path, &[], objects, verbose)?;
-    filter_symbols(&merged_path, &filter_list)?;
+    filter_symbols(&merged_path, &filter_list, verbose)?;
 
     Ok(())
 }
@@ -128,7 +128,7 @@ fn create_merged_object(
         merged_path.as_os_str().to_owned(),
     ]
     .to_vec();
-    args.extend(extra_args.into_iter().map(OsString::from));
+    args.extend(extra_args.iter().map(OsString::from));
 
     let mut count = 0;
     args.extend(
@@ -138,20 +138,28 @@ fn create_merged_object(
             .map(|p| p.as_ref().as_os_str().into()),
     );
     if verbose {
-        println!("Merging {} objects", count);
+        println!(
+            "Merging {} objects: {} {}",
+            count,
+            &ld_path.to_string_lossy(),
+            args.iter()
+                .map(|s| s.to_string_lossy())
+                .collect::<Vec<_>>()
+                .join(" ")
+        );
     }
 
-    Command::new(&ld_path)
-        .args(args)
-        .status()
-        .unwrap_or_else(|_| {
-            panic!(
-                "Failed to merged object files with `{}`",
-                ld_path.to_string_lossy()
-            )
-        });
+    let status = Command::new(&ld_path).args(args).status();
+    if let Ok(status) = status {
+        if status.success() {
+            return Ok(());
+        }
+    }
 
-    Ok(())
+    panic!(
+        "Failed to merged object files with `{}`",
+        ld_path.to_string_lossy()
+    )
 }
 
 fn create_filter_list(
@@ -204,18 +212,33 @@ fn create_filter_list(
 }
 
 #[cfg(not(target_os = "macos"))]
-fn filter_symbols(object_path: &Path, filter_list_path: &Path) -> Result<(), Box<dyn Error>> {
+fn filter_symbols(
+    object_path: &Path,
+    filter_list_path: &Path,
+    verbose: bool,
+) -> Result<(), Box<dyn Error>> {
     let args = vec![
         OsString::from("--localize-symbols"),
         filter_list_path.as_os_str().to_owned(),
         object_path.as_os_str().to_owned(),
     ];
-    Command::new("objcopy")
-        .args(args)
-        .status()
-        .expect("Failed to filter symbols with objcopy");
+    if verbose {
+        println!(
+            "objcopy {}",
+            args.iter()
+                .map(|s| s.to_string_lossy())
+                .collect::<Vec<_>>()
+                .join(" ")
+        );
+    }
+    let status = Command::new("objcopy").args(args).status();
+    if let Ok(status) = status {
+        if status.success() {
+            return Ok(());
+        }
+    }
 
-    Ok(())
+    panic!("Failed to filter symbols with objcopy")
 }
 
 pub fn merge(

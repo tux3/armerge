@@ -52,14 +52,24 @@ impl MacArBuilder {
                 .map(|p| p.as_os_str().into()),
         );
         if self.verbose {
-            println!("Merging {} objects", count);
+            println!(
+                "Merging {} objects: libtool {}",
+                count,
+                args.iter()
+                    .map(|s| s.to_string_lossy())
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            );
         }
 
-        Command::new("libtool")
-            .args(args)
-            .status()
-            .unwrap_or_else(|_| panic!("Failed to merged object files with `libtool`"));
-        Ok(())
+        let status = Command::new("libtool").args(args).status();
+        if let Ok(status) = status {
+            if status.success() {
+                return Ok(());
+            }
+        }
+
+        panic!("Failed to merged object files with `libtool`")
     }
 }
 

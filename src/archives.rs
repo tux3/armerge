@@ -32,15 +32,21 @@ pub fn extract_objects(archives: &[PathBuf]) -> Result<ObjectTempDir, Box<dyn Er
 }
 
 #[cfg(not(target_os = "macos"))]
-pub fn create_index(archive_path: &std::path::Path) -> Result<(), Box<dyn Error>> {
+pub fn create_index(archive_path: &std::path::Path, verbose: bool) -> Result<(), Box<dyn Error>> {
     use std::process::Command;
 
-    Command::new("ranlib")
-        .args(vec![archive_path])
-        .status()
-        .expect("Failed to create archive index with `ranlib`");
+    if verbose {
+        println!("ranlib {}", archive_path.to_string_lossy());
+    }
 
-    Ok(())
+    let status = Command::new("ranlib").args(vec![archive_path]).status();
+    if let Ok(status) = status {
+        if status.success() {
+            return Ok(());
+        }
+    }
+
+    panic!("Failed to create archive index with `ranlib`")
 }
 
 pub fn merge(mut output: impl ArBuilder, archives: &[PathBuf]) -> Result<(), Box<dyn Error>> {
