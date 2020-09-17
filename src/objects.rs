@@ -265,6 +265,10 @@ pub fn merge(
 
     let required_objects = filter_required_objects(&objects.objects, &keep_regexes, verbose)?;
 
+    if required_objects.is_empty() {
+        panic!("Zero objects left after filtering! Make sure to keep at least one public symbol.");
+    }
+
     // When filtering symbols to keep just the public API visible,
     // we must make an exception for the personality routines (if linked statically)
     keep_regexes.push(Regex::new("_?__g.._personality_.*")?);
