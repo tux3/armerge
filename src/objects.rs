@@ -263,6 +263,10 @@ pub fn merge(
         .map(|r| Regex::new(&r))
         .collect::<Result<Vec<_>, _>>()?;
 
+    // When filtering symbols to keep just the public API visible,
+    // we must make an exception for the unwind symbols (if linked statically)
+    keep_regexes.push(Regex::new("^_?_Unwind_.*")?);
+
     let required_objects = filter_required_objects(&objects.objects, &keep_regexes, verbose)?;
 
     if required_objects.is_empty() {
@@ -270,8 +274,10 @@ pub fn merge(
     }
 
     // When filtering symbols to keep just the public API visible,
-    // we must make an exception for the personality routines (if linked statically)
+    // we must make an exception for the unwind symbols (if linked statically)
+    // However, some symbols are not indicative of the fact that we need to keep an object file
     keep_regexes.push(Regex::new("_?__g.._personality_.*")?);
+
     let filter_path = create_filter_list(
         objects.dir.path(),
         required_objects.keys(),
