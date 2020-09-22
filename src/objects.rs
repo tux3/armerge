@@ -117,6 +117,12 @@ fn create_merged_object(
     objects: impl IntoIterator<Item = impl AsRef<Path>>,
     verbose: bool,
 ) -> Result<(), Box<dyn Error>> {
+    let ldflags = if let Ok(ldflags) = std::env::var("ARMERGE_LDFLAGS") {
+        ldflags.split(' ').map(OsString::from).collect::<Vec<_>>()
+    } else {
+        Vec::new()
+    };
+
     let ld_path = if let Some(ld_var) = std::env::var_os("LD") {
         ld_var
     } else {
@@ -129,6 +135,7 @@ fn create_merged_object(
     ]
     .to_vec();
     args.extend(extra_args.iter().map(OsString::from));
+    args.extend(ldflags);
 
     let mut count = 0;
     args.extend(
