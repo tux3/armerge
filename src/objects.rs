@@ -33,7 +33,7 @@ fn filter_required_objects(
     objects: &[PathBuf],
     keep_regexes: &[Regex],
     verbose: bool,
-) -> Result<HashMap<PathBuf, ObjectSyms>, Box<dyn Error>> {
+) -> HashMap<PathBuf, ObjectSyms> {
     let mut object_syms = objects
         .into_par_iter()
         .map(|obj_path| {
@@ -74,10 +74,10 @@ fn filter_required_objects(
         }
     }
 
-    Ok(object_syms
+    object_syms
         .into_iter()
         .filter(|(obj_path, _)| required_objs.contains(obj_path))
-        .collect())
+        .collect()
 }
 
 #[cfg(not(target_os = "macos"))]
@@ -274,7 +274,7 @@ pub fn merge(
     // we must make an exception for the unwind symbols (if linked statically)
     keep_regexes.push(Regex::new("^_?_Unwind_.*")?);
 
-    let required_objects = filter_required_objects(&objects.objects, &keep_regexes, verbose)?;
+    let required_objects = filter_required_objects(&objects.objects, &keep_regexes, verbose);
 
     if required_objects.is_empty() {
         panic!("Zero objects left after filtering! Make sure to keep at least one public symbol.");

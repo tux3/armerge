@@ -78,7 +78,7 @@ impl ObjectSyms {
             .map(|(left_path, left_syms)| {
                 let mut deps = HashSet::new();
                 for (right_path, right_syms) in object_syms.iter() {
-                    if left_path as *const _ == right_path as *const _ {
+                    if std::ptr::eq(left_path, right_path) {
                         continue;
                     }
 
