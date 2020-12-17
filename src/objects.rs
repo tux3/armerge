@@ -1,6 +1,6 @@
 use crate::arbuilder::ArBuilder;
 use crate::object_syms::ObjectSyms;
-use object::{Object, SymbolKind};
+use object::{Object, ObjectSymbol, SymbolKind};
 use rayon::prelude::*;
 use regex::Regex;
 use std::collections::{HashMap, HashSet};
@@ -182,14 +182,14 @@ fn create_filter_list(
     for object_path in objects.into_iter() {
         let data = std::fs::read(object_path)?;
         let file = object::File::parse(&data)?;
-        'next_symbol: for (_idx, sym) in file.symbols() {
+        'next_symbol: for sym in file.symbols() {
             if !sym.is_global()
                 || sym.is_undefined()
                 || (sym.kind() != SymbolKind::Text && sym.kind() != SymbolKind::Data)
             {
                 continue;
             }
-            if let Some(name) = sym.name() {
+            if let Ok(name) = sym.name() {
                 for regex in keep_regexes {
                     if regex.is_match(name) {
                         kept_count += 1;

@@ -1,4 +1,4 @@
-use object::{Object, SymbolKind};
+use object::{Object, ObjectSymbol, SymbolKind};
 use rayon::prelude::*;
 use regex::Regex;
 use std::collections::{HashMap, HashSet};
@@ -22,7 +22,7 @@ impl ObjectSyms {
 
         let data = std::fs::read(object_path)?;
         let file = object::File::parse(&data)?;
-        for (_idx, sym) in file.symbols() {
+        for sym in file.symbols() {
             if sym.kind() != SymbolKind::Text
                 && sym.kind() != SymbolKind::Data
                 && sym.kind() != SymbolKind::Unknown
@@ -30,7 +30,7 @@ impl ObjectSyms {
                 continue;
             }
 
-            if let Some(name) = sym.name() {
+            if let Ok(name) = sym.name() {
                 if sym.is_undefined() {
                     undefineds.insert(name.to_owned());
                 } else if sym.is_global() || sym.is_weak() {
@@ -42,7 +42,7 @@ impl ObjectSyms {
                 continue;
             }
 
-            if let Some(name) = sym.name() {
+            if let Ok(name) = sym.name() {
                 for regex in keep_regexes {
                     if regex.is_match(name) {
                         has_exported_symbols = true;
