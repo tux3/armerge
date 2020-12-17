@@ -5,6 +5,7 @@ use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
 use std::error::Error;
 use std::fs::File;
+use std::io::Write;
 use std::path::PathBuf;
 use std::str::from_utf8;
 use tempdir::TempDir;
@@ -49,14 +50,14 @@ pub fn create_index(archive_path: &std::path::Path, verbose: bool) -> Result<(),
         println!("ranlib {}", archive_path.to_string_lossy());
     }
 
-    let status = Command::new("ranlib").args(vec![archive_path]).status();
-    if let Ok(status) = status {
-        if status.success() {
-            return Ok(());
-        }
+    let output = Command::new("ranlib").args(vec![archive_path]).output()?;
+    if output.status.success() {
+        Ok(())
+    } else {
+        std::io::stdout().write_all(&output.stdout).unwrap();
+        std::io::stderr().write_all(&output.stderr).unwrap();
+        panic!("Failed to create archive index with `ranlib`")
     }
-
-    panic!("Failed to create archive index with `ranlib`")
 }
 
 pub fn merge(mut output: impl ArBuilder, archives: &[PathBuf]) -> Result<(), Box<dyn Error>> {

@@ -1,6 +1,7 @@
 use crate::arbuilder::ArBuilder;
 use std::error::Error;
 use std::ffi::OsString;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -62,14 +63,14 @@ impl MacArBuilder {
             );
         }
 
-        let status = Command::new("libtool").args(args).status();
-        if let Ok(status) = status {
-            if status.success() {
-                return Ok(());
-            }
+        let output = Command::new("libtool").args(args).output();
+        if output.status.success() {
+            Ok(())
+        } else {
+            std::io::stdout().write_all(&output.stdout).unwrap();
+            std::io::stderr().write_all(&output.stderr).unwrap();
+            panic!("Failed to merged object files with `libtool`")
         }
-
-        panic!("Failed to merged object files with `libtool`")
     }
 }
 

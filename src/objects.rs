@@ -156,17 +156,17 @@ fn create_merged_object(
         );
     }
 
-    let status = Command::new(&ld_path).args(args).status();
-    if let Ok(status) = status {
-        if status.success() {
-            return Ok(());
-        }
+    let output = Command::new(&ld_path).args(args).output()?;
+    if output.status.success() {
+        Ok(())
+    } else {
+        std::io::stdout().write_all(&output.stdout).unwrap();
+        std::io::stderr().write_all(&output.stderr).unwrap();
+        panic!(
+            "Failed to merged object files with `{}`",
+            ld_path.to_string_lossy()
+        )
     }
-
-    panic!(
-        "Failed to merged object files with `{}`",
-        ld_path.to_string_lossy()
-    )
 }
 
 fn create_filter_list(
@@ -245,14 +245,15 @@ fn filter_symbols(
                 .join(" ")
         );
     }
-    let status = Command::new(objcopy_path).args(args).status();
-    if let Ok(status) = status {
-        if status.success() {
-            return Ok(());
-        }
-    }
 
-    panic!("Failed to filter symbols with objcopy")
+    let output = Command::new(objcopy_path).args(args).output()?;
+    if output.status.success() {
+        Ok(())
+    } else {
+        std::io::stdout().write_all(&output.stdout).unwrap();
+        std::io::stderr().write_all(&output.stderr).unwrap();
+        panic!("Failed to filter symbols with objcopy")
+    }
 }
 
 pub fn merge(
