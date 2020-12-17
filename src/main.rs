@@ -30,6 +30,10 @@ struct Opt {
 fn main() -> Result<(), Box<dyn Error>> {
     let opt = Opt::from_args();
 
+    if opt.inputs.is_empty() {
+        return Err(From::from("No input file specified"));
+    }
+
     let builder = arbuilder::platform_builder(&opt.output, opt.verbose);
     if opt.keep_symbols.is_empty() {
         archives::merge(builder, &opt.inputs)?;
