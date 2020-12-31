@@ -1,6 +1,5 @@
 mod arbuilder;
 mod archives;
-mod object_syms;
 mod objects;
 
 use std::error::Error;

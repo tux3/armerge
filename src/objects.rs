@@ -1,259 +1,26 @@
+mod filter_deps;
+mod merge;
+mod syms;
+
+#[cfg(all(feature = "objpoke", any(target_os = "linux", target_os = "android")))]
+mod builtin_filter;
+#[cfg(all(feature = "objpoke", any(target_os = "linux", target_os = "android")))]
+use crate::objects::builtin_filter::merge_required_objects;
+
+#[cfg(not(all(feature = "objpoke", any(target_os = "linux", target_os = "android"))))]
+mod system_filter;
+#[cfg(not(all(feature = "objpoke", any(target_os = "linux", target_os = "android"))))]
+use crate::objects::system_filter::merge_required_objects;
+
 use crate::arbuilder::ArBuilder;
-use crate::object_syms::ObjectSyms;
-use object::{Object, ObjectSymbol, SymbolKind};
-use rayon::prelude::*;
 use regex::Regex;
-use std::collections::{HashMap, HashSet};
 use std::error::Error;
-use std::ffi::OsString;
-use std::io::Write;
-use std::path::{Path, PathBuf};
-use std::process::Command;
-use std::str::FromStr;
+use std::path::PathBuf;
 use tempdir::TempDir;
 
 pub struct ObjectTempDir {
     pub dir: TempDir,
     pub objects: Vec<PathBuf>,
-}
-
-fn add_deps_recursive(
-    objs_set: &mut HashSet<PathBuf>,
-    syms: &HashMap<PathBuf, ObjectSyms>,
-    obj: &ObjectSyms,
-) {
-    for dep in &obj.deps {
-        if objs_set.insert(dep.to_owned()) {
-            add_deps_recursive(objs_set, syms, syms.get(dep).unwrap());
-        }
-    }
-}
-
-fn filter_required_objects(
-    objects: &[PathBuf],
-    keep_regexes: &[Regex],
-    verbose: bool,
-) -> HashMap<PathBuf, ObjectSyms> {
-    let mut object_syms = objects
-        .into_par_iter()
-        .map(|obj_path| {
-            (
-                obj_path.to_owned(),
-                ObjectSyms::new(&obj_path, keep_regexes).unwrap(),
-            )
-        })
-        .collect::<HashMap<PathBuf, ObjectSyms>>();
-    ObjectSyms::check_dependencies(&mut object_syms);
-
-    let mut required_objs = HashSet::new();
-    for (obj_path, obj) in object_syms.iter() {
-        if obj.has_exported_symbols {
-            if verbose {
-                let filename = obj_path.file_name().unwrap().to_string_lossy();
-                let name_parts = filename.rsplitn(3, '.').collect::<Vec<_>>();
-                println!(
-                    "Will merge {:?} and its dependencies, as it contains global kept symbols",
-                    name_parts[2],
-                );
-            }
-            required_objs.insert(obj_path.clone());
-            add_deps_recursive(&mut required_objs, &object_syms, obj);
-        }
-    }
-
-    if verbose {
-        for obj in object_syms.keys() {
-            if !required_objs.contains(obj) {
-                let filename = obj.file_name().unwrap().to_string_lossy();
-                let name_parts = filename.rsplitn(3, '.').collect::<Vec<_>>();
-                println!(
-                    "note: `{}` is not used by any kept objects, it will be skipped",
-                    name_parts[2]
-                )
-            }
-        }
-    }
-
-    object_syms
-        .into_iter()
-        .filter(|(obj_path, _)| required_objs.contains(obj_path))
-        .collect()
-}
-
-#[cfg(not(target_os = "macos"))]
-fn create_filtered_merged_object(
-    merged_path: &Path,
-    objects: impl IntoIterator<Item = impl AsRef<Path>>,
-    filter_list: &Path,
-    verbose: bool,
-) -> Result<(), Box<dyn Error>> {
-    create_merged_object(&merged_path, &[], objects, verbose)?;
-    filter_symbols(&merged_path, &filter_list, verbose)?;
-
-    Ok(())
-}
-
-#[cfg(target_os = "macos")]
-fn create_filtered_merged_object(
-    merged_path: &Path,
-    objects: impl IntoIterator<Item = impl AsRef<Path>>,
-    filter_list: &Path,
-    verbose: bool,
-) -> Result<(), Box<dyn Error>> {
-    let extra_args = &[
-        "-unexported_symbols_list".to_owned(),
-        filter_list.to_str().unwrap().to_owned(),
-    ];
-    let merged_firstpass_path = merged_path.parent().unwrap().join("merged_firstpass.o");
-    create_merged_object(&merged_firstpass_path, extra_args, objects, verbose)?;
-    create_merged_object(&merged_path, &[], &[&merged_firstpass_path], false)?;
-
-    Ok(())
-}
-
-fn create_merged_object(
-    merged_path: &Path,
-    extra_args: &[String],
-    objects: impl IntoIterator<Item = impl AsRef<Path>>,
-    verbose: bool,
-) -> Result<(), Box<dyn Error>> {
-    let ldflags = if let Ok(ldflags) = std::env::var("ARMERGE_LDFLAGS") {
-        ldflags.split(' ').map(OsString::from).collect::<Vec<_>>()
-    } else {
-        Vec::new()
-    };
-
-    let ld_path = if let Some(ld_var) = std::env::var_os("LD") {
-        ld_var
-    } else {
-        OsString::from_str("ld").unwrap()
-    };
-    let mut args = [
-        OsString::from("-r"),
-        OsString::from("-o"),
-        merged_path.as_os_str().to_owned(),
-    ]
-    .to_vec();
-    args.extend(extra_args.iter().map(OsString::from));
-    args.extend(ldflags);
-
-    let mut count = 0;
-    args.extend(
-        objects
-            .into_iter()
-            .inspect(|_| count += 1)
-            .map(|p| p.as_ref().as_os_str().into()),
-    );
-    if verbose {
-        println!(
-            "Merging {} objects: {} {}",
-            count,
-            &ld_path.to_string_lossy(),
-            args.iter()
-                .map(|s| s.to_string_lossy())
-                .collect::<Vec<_>>()
-                .join(" ")
-        );
-    }
-
-    let output = Command::new(&ld_path).args(args).output()?;
-    if output.status.success() {
-        Ok(())
-    } else {
-        std::io::stdout().write_all(&output.stdout).unwrap();
-        std::io::stderr().write_all(&output.stderr).unwrap();
-        panic!(
-            "Failed to merged object files with `{}`",
-            ld_path.to_string_lossy()
-        )
-    }
-}
-
-fn create_filter_list(
-    object_dir: &Path,
-    objects: impl IntoIterator<Item = impl AsRef<Path>>,
-    keep_regexes: &[Regex],
-    verbose: bool,
-) -> Result<PathBuf, Box<dyn Error>> {
-    let filter_path = object_dir.join("localize.syms");
-    let mut filter_syms = HashSet::new();
-    let mut kept_count = 0;
-
-    for object_path in objects.into_iter() {
-        let data = std::fs::read(object_path)?;
-        let file = object::File::parse(&data)?;
-        'next_symbol: for sym in file.symbols() {
-            if !sym.is_global()
-                || sym.is_undefined()
-                || (sym.kind() != SymbolKind::Text && sym.kind() != SymbolKind::Data)
-            {
-                continue;
-            }
-            if let Ok(name) = sym.name() {
-                for regex in keep_regexes {
-                    if regex.is_match(name) {
-                        kept_count += 1;
-                        continue 'next_symbol;
-                    }
-                }
-
-                filter_syms.insert(name.to_owned());
-            }
-        }
-    }
-    if verbose {
-        println!(
-            "Localizing {} symbols, keeping {} globals",
-            filter_syms.len(),
-            kept_count
-        );
-    }
-
-    let mut filter_file = std::fs::File::create(&filter_path)?;
-    for sym_name in filter_syms {
-        filter_file.write_all(sym_name.as_bytes())?;
-        filter_file.write_all(b"\n")?;
-    }
-
-    Ok(filter_path)
-}
-
-#[cfg(not(target_os = "macos"))]
-fn filter_symbols(
-    object_path: &Path,
-    filter_list_path: &Path,
-    verbose: bool,
-) -> Result<(), Box<dyn Error>> {
-    let objcopy_path = if let Some(var) = std::env::var_os("OBJCOPY") {
-        var
-    } else {
-        OsString::from_str("objcopy").unwrap()
-    };
-
-    let args = vec![
-        OsString::from("--localize-symbols"),
-        filter_list_path.as_os_str().to_owned(),
-        object_path.as_os_str().to_owned(),
-    ];
-    if verbose {
-        println!(
-            "{} {}",
-            objcopy_path.to_string_lossy(),
-            args.iter()
-                .map(|s| s.to_string_lossy())
-                .collect::<Vec<_>>()
-                .join(" ")
-        );
-    }
-
-    let output = Command::new(objcopy_path).args(args).output()?;
-    if output.status.success() {
-        Ok(())
-    } else {
-        std::io::stdout().write_all(&output.stdout).unwrap();
-        std::io::stderr().write_all(&output.stderr).unwrap();
-        panic!("Failed to filter symbols with objcopy")
-    }
 }
 
 pub fn merge(
@@ -275,7 +42,8 @@ pub fn merge(
     // we must make an exception for the unwind symbols (if linked statically)
     keep_regexes.push(Regex::new("^_?_Unwind_.*")?);
 
-    let required_objects = filter_required_objects(&objects.objects, &keep_regexes, verbose);
+    let required_objects =
+        filter_deps::filter_required_objects(&objects.objects, &keep_regexes, verbose);
 
     if required_objects.is_empty() {
         panic!("Zero objects left after filtering! Make sure to keep at least one public symbol.");
@@ -286,14 +54,13 @@ pub fn merge(
     // However, some symbols are not indicative of the fact that we need to keep an object file
     keep_regexes.push(Regex::new("_?__g.._personality_.*")?);
 
-    let filter_path = create_filter_list(
+    merge_required_objects(
         objects.dir.path(),
-        required_objects.keys(),
+        &merged_path,
+        &required_objects,
         &keep_regexes,
         verbose,
     )?;
-
-    create_filtered_merged_object(&merged_path, required_objects.keys(), &filter_path, verbose)?;
 
     output.append_obj(merged_path)?;
     output.close()?;
