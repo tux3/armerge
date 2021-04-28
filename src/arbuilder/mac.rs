@@ -63,7 +63,7 @@ impl MacArBuilder {
             );
         }
 
-        let output = Command::new("libtool").args(args).output();
+        let output = Command::new("libtool").args(args).output()?;
         if output.status.success() {
             Ok(())
         } else {
