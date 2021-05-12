@@ -34,7 +34,7 @@ checksum = "450575f58f7bee32816abbff470cbc47797397c2a81e0eaced4b98436daf52e1"
 
 [[package]]
 name = "armerge"
-version = "1.2.1"
+version = "1.2.2"
 dependencies = [
  "ar",
  "object",

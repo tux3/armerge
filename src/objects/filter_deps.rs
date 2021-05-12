@@ -29,7 +29,15 @@ pub fn filter_required_objects(
         .map(|obj_path| {
             (
                 obj_path.to_owned(),
-                ObjectSyms::new(&obj_path, keep_regexes).unwrap(),
+                ObjectSyms::new(&obj_path, keep_regexes)
+                    .map_err(|e| {
+                        Box::new(format!(
+                            "Failed to open object {}: {}",
+                            obj_path.display(),
+                            e
+                        ))
+                    })
+                    .unwrap(),
             )
         })
         .collect::<HashMap<PathBuf, ObjectSyms>>();
