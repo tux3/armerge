@@ -34,9 +34,10 @@ checksum = "450575f58f7bee32816abbff470cbc47797397c2a81e0eaced4b98436daf52e1"
 
 [[package]]
 name = "armerge"
-version = "1.2.2"
+version = "1.3.0"
 dependencies = [
  "ar",
+ "goblin",
  "object",
  "objpoke",
  "rand 0.7.3",
@@ -306,9 +307,9 @@ dependencies = [
 
 [[package]]
 name = "objpoke"
-version = "0.1.0"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fddd0085047b05e3cca78f7ba698bd5413ba810d4cc2a3c1231522104689b561"
+checksum = "800ba47f7a40656a469cf451a76c3a1a12129820c38eee8bd8c0f518ca47e1a6"
 dependencies = [
  "eyre",
  "goblin",

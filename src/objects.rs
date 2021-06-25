@@ -2,14 +2,28 @@ mod filter_deps;
 mod merge;
 mod syms;
 
-#[cfg(all(feature = "objpoke", any(target_os = "linux", target_os = "android")))]
+#[cfg(all(
+    feature = "objpoke_symbols",
+    any(target_os = "linux", target_os = "android")
+))]
 mod builtin_filter;
-#[cfg(all(feature = "objpoke", any(target_os = "linux", target_os = "android")))]
+
+#[cfg(all(
+    feature = "objpoke_symbols",
+    any(target_os = "linux", target_os = "android")
+))]
 use crate::objects::builtin_filter::merge_required_objects;
 
-#[cfg(not(all(feature = "objpoke", any(target_os = "linux", target_os = "android"))))]
+#[cfg(not(all(
+    feature = "objpoke_symbols",
+    any(target_os = "linux", target_os = "android")
+)))]
 mod system_filter;
-#[cfg(not(all(feature = "objpoke", any(target_os = "linux", target_os = "android"))))]
+
+#[cfg(not(all(
+    feature = "objpoke_symbols",
+    any(target_os = "linux", target_os = "android")
+)))]
 use crate::objects::system_filter::merge_required_objects;
 
 use crate::arbuilder::ArBuilder;
