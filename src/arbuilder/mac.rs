@@ -73,9 +73,3 @@ impl MacArBuilder {
         }
     }
 }
-
-impl Drop for MacArBuilder {
-    fn drop(&mut self) {
-        self.write_obj().unwrap();
-    }
-}

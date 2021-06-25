@@ -42,9 +42,3 @@ impl CommonArBuilder {
         archives::create_index(&self.output_path, self.verbose)
     }
 }
-
-impl Drop for CommonArBuilder {
-    fn drop(&mut self) {
-        self.finalize_index().unwrap();
-    }
-}
