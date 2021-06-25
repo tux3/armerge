@@ -19,8 +19,8 @@ pub fn create_filtered_merged_object(
     filter_list: &Path,
     verbose: bool,
 ) -> Result<(), Box<dyn Error>> {
-    create_merged_object(&merged_path, &[], objects, verbose)?;
-    filter_symbols(&merged_path, &filter_list, verbose)?;
+    create_merged_object(merged_path, &[], objects, verbose)?;
+    filter_symbols(merged_path, filter_list, verbose)?;
 
     Ok(())
 }
@@ -137,6 +137,6 @@ pub fn merge_required_objects(
     keep_regexes: &[Regex],
     verbose: bool,
 ) -> Result<(), Box<dyn Error>> {
-    let filter_path = create_symbol_filter_list(obj_dir, objects.keys(), &keep_regexes, verbose)?;
-    create_filtered_merged_object(&merged_path, objects.keys(), &filter_path, verbose)
+    let filter_path = create_symbol_filter_list(obj_dir, objects.keys(), keep_regexes, verbose)?;
+    create_filtered_merged_object(merged_path, objects.keys(), &filter_path, verbose)
 }

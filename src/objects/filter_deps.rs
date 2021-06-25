@@ -29,7 +29,7 @@ pub fn filter_required_objects(
         .map(|obj_path| {
             (
                 obj_path.to_owned(),
-                ObjectSyms::new(&obj_path, keep_regexes)
+                ObjectSyms::new(obj_path, keep_regexes)
                     .map_err(|e| {
                         Box::new(format!(
                             "Failed to open object {}: {}",
