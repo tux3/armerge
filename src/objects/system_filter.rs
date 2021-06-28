@@ -1,7 +1,8 @@
+use goblin::{peek_bytes, Hint};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::ffi::OsString;
-use std::io::Write;
+use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::str::FromStr;
@@ -11,6 +12,7 @@ use regex::Regex;
 
 use crate::objects::merge::create_merged_object;
 use crate::objects::syms::ObjectSyms;
+use std::fs::File;
 
 #[cfg(not(target_os = "macos"))]
 pub fn create_filtered_merged_object(
@@ -19,8 +21,8 @@ pub fn create_filtered_merged_object(
     filter_list: &Path,
     verbose: bool,
 ) -> Result<(), Box<dyn Error>> {
-    create_merged_object(&merged_path, &[], objects, verbose)?;
-    filter_symbols(&merged_path, &filter_list, verbose)?;
+    create_merged_object(merged_path, &[], objects, verbose)?;
+    filter_symbols(merged_path, filter_list, verbose)?;
 
     Ok(())
 }
@@ -137,6 +139,47 @@ pub fn merge_required_objects(
     keep_regexes: &[Regex],
     verbose: bool,
 ) -> Result<(), Box<dyn Error>> {
-    let filter_path = create_symbol_filter_list(obj_dir, objects.keys(), &keep_regexes, verbose)?;
-    create_filtered_merged_object(&merged_path, objects.keys(), &filter_path, verbose)
+    let filter_path = create_symbol_filter_list(obj_dir, objects.keys(), keep_regexes, verbose)?;
+    create_filtered_merged_object(merged_path, objects.keys(), &filter_path, verbose)?;
+
+    // If a symbol we localize is in a COMDAT section group, we also want to turn it into a regular
+    // section group. Otherwise the local symbol is not really local, because the containing section
+    // could later get COMDAT-folded with other (potentially incompatible) object files.
+    demote_elf_comdats(merged_path, keep_regexes, verbose)
+}
+
+fn demote_elf_comdats(
+    merged_path: &Path,
+    keep_regexes: &[Regex],
+    verbose: bool,
+) -> Result<(), Box<dyn Error>> {
+    let mut file = File::open(merged_path)?;
+    let hint_bytes = &mut [0u8; 16];
+    file.read_exact(hint_bytes)?;
+    file.seek(SeekFrom::Start(0))?;
+
+    let new_data = {
+        match peek_bytes(hint_bytes)? {
+            Hint::Elf(_) => {
+                if verbose {
+                    println!(
+                        "Automatically demoting ELF COMDAT section groups in {}",
+                        merged_path.display()
+                    )
+                }
+
+                let mut data = Vec::new();
+                file.read_to_end(&mut data)?;
+                objpoke::elf::demote_comdat_groups(data, keep_regexes)?
+            }
+            // We don't know about needing to demote any COMDATs in PE/Mach-O files
+            Hint::Mach(_) | Hint::MachFat(_) => return Ok(()),
+            Hint::PE => return Ok(()),
+            _ => return Ok(()),
+        }
+    };
+
+    drop(file);
+    std::fs::write(merged_path, new_data)?;
+    Ok(())
 }
