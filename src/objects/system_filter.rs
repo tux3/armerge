@@ -103,7 +103,7 @@ fn filter_symbols(
     let objcopy_path = if let Some(var) = std::env::var_os("OBJCOPY") {
         var
     } else {
-        OsString::from_str("objcopy").unwrap()
+        OsString::from_str("llvm-objcopy").unwrap()
     };
 
     let args = vec![
