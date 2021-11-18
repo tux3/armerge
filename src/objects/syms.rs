@@ -21,7 +21,7 @@ impl ObjectSyms {
         let mut has_exported_symbols = false;
 
         let data = std::fs::read(object_path)?;
-        let file = object::File::parse(&data)?;
+        let file = object::File::parse(data.as_slice())?;
         for sym in file.symbols() {
             if sym.kind() != SymbolKind::Text
                 && sym.kind() != SymbolKind::Data

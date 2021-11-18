@@ -57,7 +57,7 @@ pub fn create_symbol_filter_list(
 
     for object_path in objects.into_iter() {
         let data = std::fs::read(object_path)?;
-        let file = object::File::parse(&data)?;
+        let file = object::File::parse(data.as_slice())?;
         'next_symbol: for sym in file.symbols() {
             if !sym.is_global()
                 || sym.is_undefined()

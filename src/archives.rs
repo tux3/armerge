@@ -1,8 +1,8 @@
 use crate::arbuilder::ArBuilder;
 use crate::objects::ObjectTempDir;
 use ar::Archive;
-use rand::distributions::Alphanumeric;
-use rand::{thread_rng, Rng};
+use rand::distributions::{Alphanumeric, DistString};
+use rand::thread_rng;
 use std::error::Error;
 use std::fs::File;
 use std::io::Write;
@@ -24,12 +24,12 @@ pub fn extract_objects(archives: &[PathBuf]) -> Result<ObjectTempDir, Box<dyn Er
         while let Some(entry_result) = archive.next_entry() {
             let mut entry = entry_result?;
 
-            let rnd: String = thread_rng().sample_iter(&Alphanumeric).take(8).collect();
+            let rnd: String = Alphanumeric.sample_string(&mut thread_rng(), 8);
             let mut obj_path = dir.path().to_owned();
             obj_path.push(format!(
                 "{}@{}.{}.o",
                 archive_name,
-                from_utf8(entry.header().identifier())?.to_string(),
+                from_utf8(entry.header().identifier())?,
                 &rnd
             ));
 
