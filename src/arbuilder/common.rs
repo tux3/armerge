@@ -1,7 +1,7 @@
 use crate::arbuilder::ArBuilder;
 use crate::archives;
+use anyhow::Result;
 use ar::Builder;
-use std::error::Error;
 use std::fs::File;
 use std::path::{Path, PathBuf};
 
@@ -13,12 +13,12 @@ pub struct CommonArBuilder {
 }
 
 impl ArBuilder for CommonArBuilder {
-    fn append_obj<P: AsRef<Path>>(&mut self, path: P) -> Result<(), Box<dyn Error>> {
+    fn append_obj<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
         self.builder.append_path(path)?;
         Ok(())
     }
 
-    fn close(mut self) -> Result<(), Box<dyn Error>> {
+    fn close(mut self) -> Result<()> {
         self.finalize_index()
     }
 }
@@ -33,7 +33,7 @@ impl CommonArBuilder {
         }
     }
 
-    fn finalize_index(&mut self) -> Result<(), Box<dyn Error>> {
+    fn finalize_index(&mut self) -> Result<()> {
         if self.closed {
             return Ok(());
         }

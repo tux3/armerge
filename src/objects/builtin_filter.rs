@@ -13,7 +13,7 @@ pub fn merge_required_objects(
     objects: &HashMap<PathBuf, ObjectSyms>,
     keep_regexes: &[Regex],
     verbose: bool,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<()> {
     // The merging part is still not builtin, it has to be done by a real linker
     merge::create_merged_object(merged_path, &[], objects.keys(), verbose)?;
 

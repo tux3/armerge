@@ -1,4 +1,4 @@
-use std::error::Error;
+use anyhow::Result;
 use std::ffi::OsString;
 use std::io::Write;
 use std::path::Path;
@@ -10,7 +10,7 @@ pub fn create_merged_object(
     extra_args: &[String],
     objects: impl IntoIterator<Item = impl AsRef<Path>>,
     verbose: bool,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<()> {
     let ldflags = if let Ok(ldflags) = std::env::var("ARMERGE_LDFLAGS") {
         ldflags.split(' ').map(OsString::from).collect::<Vec<_>>()
     } else {

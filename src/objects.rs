@@ -27,8 +27,8 @@ mod system_filter;
 use crate::objects::system_filter::merge_required_objects;
 
 use crate::arbuilder::ArBuilder;
+use anyhow::Result;
 use regex::Regex;
-use std::error::Error;
 use std::path::PathBuf;
 use tempdir::TempDir;
 
@@ -42,7 +42,7 @@ pub fn merge(
     objects: ObjectTempDir,
     keep_regexes: Vec<String>,
     verbose: bool,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<()> {
     let merged_name = "merged.o";
     let mut merged_path = objects.dir.path().to_owned();
     merged_path.push(merged_name);

@@ -1,4 +1,4 @@
-use std::error::Error;
+use anyhow::Result;
 use std::path::Path;
 
 #[cfg(not(target_os = "macos"))]
@@ -8,8 +8,8 @@ mod common;
 mod mac;
 
 pub trait ArBuilder {
-    fn append_obj<P: AsRef<Path>>(&mut self, path: P) -> Result<(), Box<dyn Error>>;
-    fn close(self) -> Result<(), Box<dyn Error>>;
+    fn append_obj<P: AsRef<Path>>(&mut self, path: P) -> Result<()>;
+    fn close(self) -> Result<()>;
 }
 
 #[cfg(not(target_os = "macos"))]

@@ -2,7 +2,7 @@ mod arbuilder;
 mod archives;
 mod objects;
 
-use std::error::Error;
+use anyhow::{bail, Result};
 use std::path::PathBuf;
 use structopt::StructOpt;
 
@@ -26,11 +26,11 @@ struct Opt {
     inputs: Vec<PathBuf>,
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
+fn main() -> Result<()> {
     let opt = Opt::from_args();
 
     if opt.inputs.is_empty() {
-        return Err(From::from("No input file specified"));
+        bail!("No input file specified");
     }
 
     let builder = arbuilder::platform_builder(&opt.output, opt.verbose);

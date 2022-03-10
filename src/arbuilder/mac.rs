@@ -13,12 +13,12 @@ pub struct MacArBuilder {
 }
 
 impl ArBuilder for MacArBuilder {
-    fn append_obj<P: AsRef<Path>>(&mut self, path: P) -> Result<(), Box<dyn Error>> {
+    fn append_obj<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
         self.obj_paths.push(path.as_ref().to_owned());
         Ok(())
     }
 
-    fn close(mut self) -> Result<(), Box<dyn Error>> {
+    fn close(mut self) -> Result<()> {
         self.write_obj()
     }
 }
@@ -33,7 +33,7 @@ impl MacArBuilder {
         }
     }
 
-    fn write_obj(&mut self) -> Result<(), Box<dyn Error>> {
+    fn write_obj(&mut self) -> Result<()> {
         if self.closed {
             return Ok(());
         }

@@ -1,17 +1,16 @@
 use goblin::{peek_bytes, Hint};
 use std::collections::{HashMap, HashSet};
-use std::error::Error;
 use std::ffi::OsString;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::str::FromStr;
 
-use object::{Object, ObjectSymbol, SymbolKind};
-use regex::Regex;
-
 use crate::objects::merge::create_merged_object;
 use crate::objects::syms::ObjectSyms;
+use anyhow::{anyhow, Result};
+use object::{Object, ObjectSymbol, SymbolKind};
+use regex::Regex;
 use std::fs::File;
 
 #[cfg(not(target_os = "macos"))]
@@ -20,7 +19,7 @@ pub fn create_filtered_merged_object(
     objects: impl IntoIterator<Item = impl AsRef<Path>>,
     filter_list: &Path,
     verbose: bool,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<()> {
     create_merged_object(merged_path, &[], objects, verbose)?;
     filter_symbols(merged_path, filter_list, verbose)?;
 
@@ -33,7 +32,7 @@ fn create_filtered_merged_object(
     objects: impl IntoIterator<Item = impl AsRef<Path>>,
     filter_list: &Path,
     verbose: bool,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<()> {
     let extra_args = &[
         "-unexported_symbols_list".to_owned(),
         filter_list.to_str().unwrap().to_owned(),
@@ -50,7 +49,7 @@ pub fn create_symbol_filter_list(
     objects: impl IntoIterator<Item = impl AsRef<Path>>,
     keep_regexes: &[Regex],
     verbose: bool,
-) -> Result<PathBuf, Box<dyn Error>> {
+) -> Result<PathBuf> {
     let filter_path = object_dir.join("localize.syms");
     let mut filter_syms = HashSet::new();
     let mut kept_count = 0;
@@ -95,11 +94,7 @@ pub fn create_symbol_filter_list(
 }
 
 #[cfg(not(target_os = "macos"))]
-fn filter_symbols(
-    object_path: &Path,
-    filter_list_path: &Path,
-    verbose: bool,
-) -> Result<(), Box<dyn Error>> {
+fn filter_symbols(object_path: &Path, filter_list_path: &Path, verbose: bool) -> Result<()> {
     let objcopy_path = if let Some(var) = std::env::var_os("OBJCOPY") {
         var
     } else {
@@ -138,7 +133,7 @@ pub fn merge_required_objects(
     objects: &HashMap<PathBuf, ObjectSyms>,
     keep_regexes: &[Regex],
     verbose: bool,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<()> {
     let filter_path = create_symbol_filter_list(obj_dir, objects.keys(), keep_regexes, verbose)?;
     create_filtered_merged_object(merged_path, objects.keys(), &filter_path, verbose)?;
 
@@ -148,11 +143,7 @@ pub fn merge_required_objects(
     demote_elf_comdats(merged_path, keep_regexes, verbose)
 }
 
-fn demote_elf_comdats(
-    merged_path: &Path,
-    keep_regexes: &[Regex],
-    verbose: bool,
-) -> Result<(), Box<dyn Error>> {
+fn demote_elf_comdats(merged_path: &Path, keep_regexes: &[Regex], verbose: bool) -> Result<()> {
     let mut file = File::open(merged_path)?;
     let hint_bytes = &mut [0u8; 16];
     file.read_exact(hint_bytes)?;
@@ -170,7 +161,7 @@ fn demote_elf_comdats(
 
                 let mut data = Vec::new();
                 file.read_to_end(&mut data)?;
-                objpoke::elf::demote_comdat_groups(data, keep_regexes)?
+                objpoke::elf::demote_comdat_groups(data, keep_regexes).map_err(|e| anyhow!(e))?
             }
             // We don't know about needing to demote any COMDATs in PE/Mach-O files
             Hint::Mach(_) | Hint::MachFat(_) => return Ok(()),

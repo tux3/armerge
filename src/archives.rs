@@ -1,21 +1,24 @@
 use crate::arbuilder::ArBuilder;
 use crate::objects::ObjectTempDir;
+use anyhow::{Context, Result};
 use ar::Archive;
 use rand::distributions::{Alphanumeric, DistString};
 use rand::thread_rng;
-use std::error::Error;
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
 use std::str::from_utf8;
 use tempdir::TempDir;
 
-pub fn extract_objects(archives: &[PathBuf]) -> Result<ObjectTempDir, Box<dyn Error>> {
+pub fn extract_objects(archives: &[PathBuf]) -> Result<ObjectTempDir> {
     let dir = TempDir::new("armerge")?;
     let mut objects = Vec::new();
 
     for archive_path in archives {
-        let mut archive = Archive::new(File::open(archive_path)?);
+        let mut archive =
+            Archive::new(File::open(archive_path).with_context(|| {
+                format!("Failed to open input file '{}'", archive_path.display())
+            })?);
         let archive_name = archive_path
             .file_name()
             .unwrap()
@@ -43,7 +46,7 @@ pub fn extract_objects(archives: &[PathBuf]) -> Result<ObjectTempDir, Box<dyn Er
 }
 
 #[cfg(not(target_os = "macos"))]
-pub fn create_index(archive_path: &std::path::Path, verbose: bool) -> Result<(), Box<dyn Error>> {
+pub fn create_index(archive_path: &std::path::Path, verbose: bool) -> Result<()> {
     use std::process::Command;
 
     if verbose {
@@ -60,7 +63,7 @@ pub fn create_index(archive_path: &std::path::Path, verbose: bool) -> Result<(),
     }
 }
 
-pub fn merge(mut output: impl ArBuilder, archives: &[PathBuf]) -> Result<(), Box<dyn Error>> {
+pub fn merge(mut output: impl ArBuilder, archives: &[PathBuf]) -> Result<()> {
     let objects_dir = extract_objects(archives)?;
 
     for obj_path in objects_dir.objects {
