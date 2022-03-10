@@ -60,7 +60,9 @@ pub fn create_symbol_filter_list(
         'next_symbol: for sym in file.symbols() {
             if !sym.is_global()
                 || sym.is_undefined()
-                || (sym.kind() != SymbolKind::Text && sym.kind() != SymbolKind::Data)
+                || (sym.kind() != SymbolKind::Text
+                    && sym.kind() != SymbolKind::Data
+                    && sym.kind() != SymbolKind::Unknown/* ASM functions often end up unknown */)
             {
                 continue;
             }
