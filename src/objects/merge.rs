@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use std::ffi::OsString;
 use std::io::Write;
 use std::path::Path;
@@ -50,7 +50,15 @@ pub fn create_merged_object(
         );
     }
 
-    let output = Command::new(&ld_path).args(args).output()?;
+    let output = Command::new(&ld_path)
+        .args(args)
+        .output()
+        .with_context(|| {
+            format!(
+                "Failed to run '{}' linker command to merge objects",
+                ld_path.to_string_lossy()
+            )
+        })?;
     if output.status.success() {
         Ok(())
     } else {

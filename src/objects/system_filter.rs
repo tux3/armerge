@@ -8,7 +8,7 @@ use std::str::FromStr;
 
 use crate::objects::merge::create_merged_object;
 use crate::objects::syms::ObjectSyms;
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use object::{Object, ObjectSymbol, SymbolKind};
 use regex::Regex;
 use std::fs::File;
@@ -117,7 +117,15 @@ fn filter_symbols(object_path: &Path, filter_list_path: &Path, verbose: bool) ->
         );
     }
 
-    let output = Command::new(objcopy_path).args(args).output()?;
+    let output = Command::new(&objcopy_path)
+        .args(args)
+        .output()
+        .with_context(|| {
+            format!(
+                "Failed to run '{}' command to filter symbols",
+                objcopy_path.to_string_lossy()
+            )
+        })?;
     if output.status.success() {
         Ok(())
     } else {
