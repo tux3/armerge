@@ -23,5 +23,5 @@ which = "4.0.2"
 anyhow = { version = "1.0.56", features = ["backtrace"] }
 
 [features]
-# Use objpoke instead of objcopy for localizing ELF symbols in-place. Very fast, but not advisable for production use.
+# EXPERIMENTAL. Uses objpoke instead of objcopy for localizing ELF symbols in-place. Very fast, but not stable for production use.
 objpoke_symbols = []
