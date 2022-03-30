@@ -1,4 +1,5 @@
 use crate::arbuilder::ArBuilder;
+use anyhow::Result;
 use std::error::Error;
 use std::ffi::OsString;
 use std::io::Write;
