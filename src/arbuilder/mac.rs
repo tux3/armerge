@@ -1,6 +1,5 @@
 use crate::arbuilder::ArBuilder;
 use anyhow::Result;
-use std::error::Error;
 use std::ffi::OsString;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -14,12 +13,12 @@ pub struct MacArBuilder {
 }
 
 impl ArBuilder for MacArBuilder {
-    fn append_obj<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
-        self.obj_paths.push(path.as_ref().to_owned());
+    fn append_obj(&mut self, path: &Path) -> Result<()> {
+        self.obj_paths.push(path.to_owned());
         Ok(())
     }
 
-    fn close(mut self) -> Result<()> {
+    fn close(mut self: Box<Self>) -> Result<()> {
         self.write_obj()
     }
 }

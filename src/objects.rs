@@ -2,34 +2,17 @@ mod filter_deps;
 mod merge;
 mod syms;
 
-#[cfg(all(
-    feature = "objpoke_symbols",
-    any(target_os = "linux", target_os = "android")
-))]
+#[cfg(feature = "objpoke_symbols")]
 mod builtin_filter;
-
-#[cfg(all(
-    feature = "objpoke_symbols",
-    any(target_os = "linux", target_os = "android")
-))]
-use crate::objects::builtin_filter::merge_required_objects;
-
-#[cfg(not(all(
-    feature = "objpoke_symbols",
-    any(target_os = "linux", target_os = "android")
-)))]
 mod system_filter;
 
-#[cfg(not(all(
-    feature = "objpoke_symbols",
-    any(target_os = "linux", target_os = "android")
-)))]
-use crate::objects::system_filter::merge_required_objects;
-
 use crate::arbuilder::ArBuilder;
+use crate::objects::syms::ObjectSyms;
+use crate::ArchiveContents;
 use anyhow::Result;
 use regex::Regex;
-use std::path::PathBuf;
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 use tempdir::TempDir;
 
 pub struct ObjectTempDir {
@@ -37,8 +20,31 @@ pub struct ObjectTempDir {
     pub objects: Vec<PathBuf>,
 }
 
+pub fn merge_required_objects(
+    contents_type: ArchiveContents,
+    obj_dir: &Path,
+    merged_path: &Path,
+    objs: &HashMap<PathBuf, ObjectSyms>,
+    keeps: &[Regex],
+    verbose: bool,
+) -> Result<()> {
+    #[allow(clippy::if_same_then_else)] // Clippy can't see both [cfg] at once
+    if contents_type == ArchiveContents::Elf {
+        #[cfg(feature = "objpoke_symbols")]
+        builtin_filter::merge_required_objects(obj_dir, merged_path, objs, keeps, verbose)?;
+        #[cfg(not(feature = "objpoke_symbols"))]
+        system_filter::merge_required_objects(obj_dir, merged_path, objs, keeps, verbose)?;
+    } else if contents_type == ArchiveContents::MachO {
+        system_filter::merge_required_macho_objects(obj_dir, merged_path, objs, keeps, verbose)?;
+    } else {
+        system_filter::merge_required_objects(obj_dir, merged_path, objs, keeps, verbose)?;
+    }
+    Ok(())
+}
+
 pub fn merge(
-    mut output: impl ArBuilder,
+    mut output: Box<dyn ArBuilder>,
+    contents_type: ArchiveContents,
     objects: ObjectTempDir,
     keep_regexes: Vec<String>,
     verbose: bool,
@@ -69,6 +75,7 @@ pub fn merge(
     keep_regexes.push(Regex::new("_?__g.._personality_.*")?);
 
     merge_required_objects(
+        contents_type,
         objects.dir.path(),
         &merged_path,
         &required_objects,
@@ -76,7 +83,7 @@ pub fn merge(
         verbose,
     )?;
 
-    output.append_obj(merged_path)?;
+    output.append_obj(&merged_path)?;
     output.close()?;
 
     Ok(())

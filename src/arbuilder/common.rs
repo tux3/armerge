@@ -13,12 +13,12 @@ pub struct CommonArBuilder {
 }
 
 impl ArBuilder for CommonArBuilder {
-    fn append_obj<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
+    fn append_obj(&mut self, path: &Path) -> Result<()> {
         self.builder.append_path(path)?;
         Ok(())
     }
 
-    fn close(mut self) -> Result<()> {
+    fn close(mut self: Box<Self>) -> Result<()> {
         self.finalize_index()
     }
 }

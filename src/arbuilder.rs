@@ -1,23 +1,18 @@
 use anyhow::Result;
 use std::path::Path;
 
-#[cfg(not(target_os = "macos"))]
-mod common;
-
-#[cfg(target_os = "macos")]
-mod mac;
+pub mod common;
+pub mod mac;
 
 pub trait ArBuilder {
-    fn append_obj<P: AsRef<Path>>(&mut self, path: P) -> Result<()>;
-    fn close(self) -> Result<()>;
+    fn append_obj(&mut self, path: &Path) -> Result<()>;
+    fn close(self: Box<Self>) -> Result<()>;
 }
 
-#[cfg(not(target_os = "macos"))]
-pub fn platform_builder(path: &Path, verbose: bool) -> impl ArBuilder {
-    common::CommonArBuilder::new(path, verbose)
-}
-
-#[cfg(target_os = "macos")]
-pub fn platform_builder(path: &Path, verbose: bool) -> impl ArBuilder {
-    mac::MacArBuilder::new(path, verbose)
+pub fn host_platform_builder(path: &Path, verbose: bool) -> Box<dyn ArBuilder> {
+    if std::env::consts::OS == "macos" {
+        Box::new(mac::MacArBuilder::new(path, verbose))
+    } else {
+        Box::new(common::CommonArBuilder::new(path, verbose))
+    }
 }

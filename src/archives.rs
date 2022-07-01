@@ -1,18 +1,47 @@
 use crate::arbuilder::ArBuilder;
 use crate::objects::ObjectTempDir;
 use anyhow::{Context, Result};
-use ar::Archive;
+use ar::{Archive, Entry};
+use goblin::{peek_bytes, Hint};
 use rand::distributions::{Alphanumeric, DistString};
 use rand::thread_rng;
 use std::fs::File;
-use std::io::Write;
+use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::PathBuf;
 use std::str::from_utf8;
 use tempdir::TempDir;
 
-pub fn extract_objects(archives: &[PathBuf]) -> Result<ObjectTempDir> {
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum ArchiveContents {
+    Elf,
+    MachO,
+    Other, // E.g. PE files
+
+    Empty,
+    Mixed,
+}
+
+pub struct ExtractedArchive {
+    pub object_dir: ObjectTempDir,
+    pub contents_type: ArchiveContents,
+}
+
+fn archive_object_type(object: &mut Entry<File>) -> Result<ArchiveContents> {
+    let hint_bytes = &mut [0u8; 16];
+    object.read_exact(hint_bytes)?;
+    object.seek(SeekFrom::Start(0))?;
+
+    Ok(match peek_bytes(hint_bytes)? {
+        Hint::Elf(_) => ArchiveContents::Elf,
+        Hint::Mach(_) | Hint::MachFat(_) => ArchiveContents::MachO,
+        _ => ArchiveContents::Other,
+    })
+}
+
+pub fn extract_objects(archives: &[PathBuf]) -> Result<ExtractedArchive> {
     let dir = TempDir::new("armerge")?;
     let mut objects = Vec::new();
+    let mut archive_contents = ArchiveContents::Empty;
 
     for archive_path in archives {
         let mut archive =
@@ -36,16 +65,25 @@ pub fn extract_objects(archives: &[PathBuf]) -> Result<ObjectTempDir> {
                 &rnd
             ));
 
+            let obj_type = archive_object_type(&mut entry)?;
+            if archive_contents == ArchiveContents::Empty {
+                archive_contents = obj_type;
+            } else if archive_contents != obj_type {
+                archive_contents = ArchiveContents::Mixed
+            }
+
             let mut file = File::create(&obj_path)?;
             std::io::copy(&mut entry, &mut file).unwrap();
             objects.push(obj_path);
         }
     }
 
-    Ok(ObjectTempDir { dir, objects })
+    Ok(ExtractedArchive {
+        object_dir: ObjectTempDir { dir, objects },
+        contents_type: archive_contents,
+    })
 }
 
-#[cfg(not(target_os = "macos"))]
 pub fn create_index(archive_path: &std::path::Path, verbose: bool) -> Result<()> {
     use std::process::Command;
 
@@ -63,13 +101,10 @@ pub fn create_index(archive_path: &std::path::Path, verbose: bool) -> Result<()>
     }
 }
 
-pub fn merge(mut output: impl ArBuilder, archives: &[PathBuf]) -> Result<()> {
-    let objects_dir = extract_objects(archives)?;
-
+pub fn merge(mut output: Box<dyn ArBuilder>, objects_dir: ObjectTempDir) -> Result<()> {
     for obj_path in objects_dir.objects {
-        output.append_obj(obj_path)?;
+        output.append_obj(obj_path.as_path())?;
     }
-
     output.close()?;
     Ok(())
 }

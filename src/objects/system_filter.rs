@@ -13,7 +13,6 @@ use object::{Object, ObjectSymbol, SymbolKind};
 use regex::Regex;
 use std::fs::File;
 
-#[cfg(not(target_os = "macos"))]
 pub fn create_filtered_merged_object(
     merged_path: &Path,
     objects: impl IntoIterator<Item = impl AsRef<Path>>,
@@ -26,8 +25,7 @@ pub fn create_filtered_merged_object(
     Ok(())
 }
 
-#[cfg(target_os = "macos")]
-fn create_filtered_merged_object(
+fn create_filtered_merged_macho_object(
     merged_path: &Path,
     objects: impl IntoIterator<Item = impl AsRef<Path>>,
     filter_list: &Path,
@@ -39,7 +37,7 @@ fn create_filtered_merged_object(
     ];
     let merged_firstpass_path = merged_path.parent().unwrap().join("merged_firstpass.o");
     create_merged_object(&merged_firstpass_path, extra_args, objects, verbose)?;
-    create_merged_object(&merged_path, &[], &[&merged_firstpass_path], false)?;
+    create_merged_object(merged_path, &[], &[&merged_firstpass_path], false)?;
 
     Ok(())
 }
@@ -95,7 +93,6 @@ pub fn create_symbol_filter_list(
     Ok(filter_path)
 }
 
-#[cfg(not(target_os = "macos"))]
 fn filter_symbols(object_path: &Path, filter_list_path: &Path, verbose: bool) -> Result<()> {
     let objcopy_path = if let Some(var) = std::env::var_os("OBJCOPY") {
         var
@@ -135,6 +132,17 @@ fn filter_symbols(object_path: &Path, filter_list_path: &Path, verbose: bool) ->
         std::io::stderr().write_all(&output.stderr).unwrap();
         panic!("Failed to filter symbols with objcopy")
     }
+}
+
+pub fn merge_required_macho_objects(
+    obj_dir: &Path,
+    merged_path: &Path,
+    objects: &HashMap<PathBuf, ObjectSyms>,
+    keep_regexes: &[Regex],
+    verbose: bool,
+) -> Result<()> {
+    let filter_path = create_symbol_filter_list(obj_dir, objects.keys(), keep_regexes, verbose)?;
+    create_filtered_merged_macho_object(merged_path, objects.keys(), &filter_path, verbose)
 }
 
 pub fn merge_required_objects(

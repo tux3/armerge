@@ -1,8 +1,7 @@
-use std::collections::HashMap;
-use std::error::Error;
-use std::path::{Path, PathBuf};
-
+use anyhow::Result;
 use regex::Regex;
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 
 use crate::objects::merge;
 use crate::objects::syms::ObjectSyms;

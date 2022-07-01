@@ -2,6 +2,10 @@ mod arbuilder;
 mod archives;
 mod objects;
 
+use crate::arbuilder::common::CommonArBuilder;
+use crate::arbuilder::mac::MacArBuilder;
+use crate::arbuilder::ArBuilder;
+use crate::archives::ArchiveContents;
 use anyhow::{bail, Result};
 use std::path::PathBuf;
 use structopt::StructOpt;
@@ -28,17 +32,35 @@ struct Opt {
 
 fn main() -> Result<()> {
     let opt = Opt::from_args();
-
     if opt.inputs.is_empty() {
         bail!("No input file specified");
     }
 
-    let builder = arbuilder::platform_builder(&opt.output, opt.verbose);
+    let extracted = archives::extract_objects(&opt.inputs)?;
+    let builder: Box<dyn ArBuilder> = match extracted.contents_type {
+        ArchiveContents::Empty => bail!("Input archives don't seem to contain any files"),
+        ArchiveContents::Elf => Box::new(CommonArBuilder::new(&opt.output, opt.verbose)),
+        ArchiveContents::MachO => Box::new(MacArBuilder::new(&opt.output, opt.verbose)),
+        ArchiveContents::Other => {
+            eprintln!("Input archives contain neither ELF nor Mach-O files, trying to continue with your host toolchain");
+            arbuilder::host_platform_builder(&opt.output, opt.verbose)
+        }
+        ArchiveContents::Mixed => {
+            eprintln!("Input archives contain different object file formats, trying to continue with your host toolchain");
+            arbuilder::host_platform_builder(&opt.output, opt.verbose)
+        }
+    };
+
     if opt.keep_symbols.is_empty() {
-        archives::merge(builder, &opt.inputs)?;
+        archives::merge(builder, extracted.object_dir)?;
     } else {
-        let objects_dir = archives::extract_objects(&opt.inputs)?;
-        objects::merge(builder, objects_dir, opt.keep_symbols, opt.verbose)?;
+        objects::merge(
+            builder,
+            extracted.contents_type,
+            extracted.object_dir,
+            opt.keep_symbols,
+            opt.verbose,
+        )?;
     }
 
     Ok(())
