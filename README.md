@@ -1,6 +1,11 @@
 
 # armerge
 
+[![crates.io](https://img.shields.io/crates/v/armerge.svg)](https://crates.io/crates/armerge)
+[![Apache 2 licensed](https://img.shields.io/badge/license-Apache%202-blue)](./LICENSE)
+![MSRV](https://img.shields.io/badge/MSRV-1.56-informational)
+[![CI](https://github.com/tux3/armerge/workflows/CI/badge.svg)](https://github.com/tux3/armerge/actions?query=workflow%3ACI)
+
 You can use armerge to combine multiple static libraries into a single merged `ar` archive.  
 Optionally, armerge can take a list of symbols you want to keep exported, and localizes (hides) the rest.  
 
