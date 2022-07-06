@@ -52,6 +52,8 @@ fn main() -> Result<()> {
     };
 
     if opt.keep_symbols.is_empty() {
+        // If we don't need to localize any symbols, this is the easy case where we just extract
+        // contents and re-pack them, no linker necessary.
         archives::merge(builder, extracted.object_dir)?;
     } else {
         objects::merge(
