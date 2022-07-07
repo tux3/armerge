@@ -1,16 +1,15 @@
-use anyhow::{Context, Result};
-use std::ffi::OsString;
-use std::io::Write;
+use crate::MergeError;
+use std::ffi::{OsStr, OsString};
 use std::path::Path;
 use std::process::Command;
 use std::str::FromStr;
 
 pub fn create_merged_object(
     merged_path: &Path,
-    extra_args: &[String],
+    extra_args: &[&OsStr],
     objects: impl IntoIterator<Item = impl AsRef<Path>>,
     verbose: bool,
-) -> Result<()> {
+) -> Result<(), MergeError> {
     let ldflags = if let Ok(ldflags) = std::env::var("ARMERGE_LDFLAGS") {
         ldflags.split(' ').map(OsString::from).collect::<Vec<_>>()
     } else {
@@ -50,23 +49,21 @@ pub fn create_merged_object(
         );
     }
 
-    let output = Command::new(&ld_path)
-        .args(args)
-        .output()
-        .with_context(|| {
-            format!(
-                "Failed to run '{}' linker command to merge objects",
-                ld_path.to_string_lossy()
-            )
-        })?;
+    let output = Command::new(&ld_path).args(&args).output().map_err(|e| {
+        MergeError::ExternalToolLaunchError {
+            tool: ld_path.to_string_lossy().to_string(),
+            inner: e,
+        }
+    })?;
     if output.status.success() {
         Ok(())
     } else {
-        std::io::stdout().write_all(&output.stdout).unwrap();
-        std::io::stderr().write_all(&output.stderr).unwrap();
-        panic!(
-            "Failed to merged object files with `{}`",
-            ld_path.to_string_lossy()
-        )
+        Err(MergeError::ExternalToolError {
+            reason: "Failed to merged object files".to_string(),
+            tool: ld_path.to_string_lossy().to_string(),
+            args,
+            stdout: output.stdout,
+            stderr: output.stderr,
+        })
     }
 }

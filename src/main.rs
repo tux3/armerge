@@ -1,12 +1,6 @@
-mod arbuilder;
-mod archives;
-mod objects;
-
-use crate::arbuilder::common::CommonArBuilder;
-use crate::arbuilder::mac::MacArBuilder;
-use crate::arbuilder::ArBuilder;
-use crate::archives::ArchiveContents;
-use anyhow::{bail, Result};
+use armerge::ArMerger;
+use regex::Regex;
+use std::error::Error;
 use std::path::PathBuf;
 use structopt::StructOpt;
 
@@ -30,39 +24,28 @@ struct Opt {
     inputs: Vec<PathBuf>,
 }
 
-fn main() -> Result<()> {
+fn main() -> Result<(), Box<dyn Error>> {
     let opt = Opt::from_args();
     if opt.inputs.is_empty() {
-        bail!("No input file specified");
+        return Err("No input file specified".to_string().into());
     }
 
-    let extracted = archives::extract_objects(&opt.inputs)?;
-    let builder: Box<dyn ArBuilder> = match extracted.contents_type {
-        ArchiveContents::Empty => bail!("Input archives don't seem to contain any files"),
-        ArchiveContents::Elf => Box::new(CommonArBuilder::new(&opt.output, opt.verbose)),
-        ArchiveContents::MachO => Box::new(MacArBuilder::new(&opt.output, opt.verbose)),
-        ArchiveContents::Other => {
-            eprintln!("Input archives contain neither ELF nor Mach-O files, trying to continue with your host toolchain");
-            arbuilder::host_platform_builder(&opt.output, opt.verbose)
-        }
-        ArchiveContents::Mixed => {
-            eprintln!("Input archives contain different object file formats, trying to continue with your host toolchain");
-            arbuilder::host_platform_builder(&opt.output, opt.verbose)
-        }
-    };
+    // TODO: Handle verbose option again
+    let _ = opt.verbose;
+
+    let merger = ArMerger::new_from_paths(&opt.inputs, &opt.output)?;
 
     if opt.keep_symbols.is_empty() {
         // If we don't need to localize any symbols, this is the easy case where we just extract
         // contents and re-pack them, no linker necessary.
-        archives::merge(builder, extracted.object_dir)?;
+        merger.merge_simple()?;
     } else {
-        objects::merge(
-            builder,
-            extracted.contents_type,
-            extracted.object_dir,
-            opt.keep_symbols,
-            opt.verbose,
-        )?;
+        let keep_symbols: Vec<Regex> = opt
+            .keep_symbols
+            .into_iter()
+            .map(|s| Regex::new(&s))
+            .collect::<Result<Vec<_>, _>>()?;
+        merger.merge_and_localize(keep_symbols)?;
     }
 
     Ok(())

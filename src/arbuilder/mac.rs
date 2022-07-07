@@ -1,10 +1,11 @@
 use crate::arbuilder::ArBuilder;
-use anyhow::Result;
+use crate::MergeError;
+use crate::MergeError::ExternalToolLaunchError;
 use std::ffi::OsString;
-use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+#[derive(Debug)]
 pub struct MacArBuilder {
     output_path: PathBuf,
     obj_paths: Vec<PathBuf>,
@@ -13,12 +14,12 @@ pub struct MacArBuilder {
 }
 
 impl ArBuilder for MacArBuilder {
-    fn append_obj(&mut self, path: &Path) -> Result<()> {
+    fn append_obj(&mut self, path: &Path) -> Result<(), MergeError> {
         self.obj_paths.push(path.to_owned());
         Ok(())
     }
 
-    fn close(mut self: Box<Self>) -> Result<()> {
+    fn close(mut self: Box<Self>) -> Result<(), MergeError> {
         self.write_obj()
     }
 }
@@ -33,7 +34,7 @@ impl MacArBuilder {
         }
     }
 
-    fn write_obj(&mut self) -> Result<()> {
+    fn write_obj(&mut self) -> Result<(), MergeError> {
         if self.closed {
             return Ok(());
         }
@@ -63,13 +64,24 @@ impl MacArBuilder {
             );
         }
 
-        let output = Command::new("libtool").args(args).output()?;
+        let output =
+            Command::new("libtool")
+                .args(&args)
+                .output()
+                .map_err(|e| ExternalToolLaunchError {
+                    tool: "libtool".to_string(),
+                    inner: e,
+                })?;
         if output.status.success() {
             Ok(())
         } else {
-            std::io::stdout().write_all(&output.stdout).unwrap();
-            std::io::stderr().write_all(&output.stderr).unwrap();
-            panic!("Failed to merged object files with `libtool`")
+            Err(MergeError::ExternalToolError {
+                reason: "Failed to merge object files with `libtool`".to_string(),
+                tool: "libtool".to_string(),
+                args,
+                stdout: output.stdout,
+                stderr: output.stderr,
+            })
         }
     }
 }

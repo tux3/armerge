@@ -8,7 +8,7 @@ use std::str::FromStr;
 
 use crate::objects::merge::create_merged_object;
 use crate::objects::syms::ObjectSyms;
-use anyhow::{anyhow, Context, Result};
+use crate::MergeError;
 use object::{Object, ObjectSymbol, SymbolKind};
 use regex::Regex;
 use std::fs::File;
@@ -18,7 +18,7 @@ pub fn create_filtered_merged_object(
     objects: impl IntoIterator<Item = impl AsRef<Path>>,
     filter_list: &Path,
     verbose: bool,
-) -> Result<()> {
+) -> Result<(), MergeError> {
     create_merged_object(merged_path, &[], objects, verbose)?;
     filter_symbols(merged_path, filter_list, verbose)?;
 
@@ -30,11 +30,8 @@ fn create_filtered_merged_macho_object(
     objects: impl IntoIterator<Item = impl AsRef<Path>>,
     filter_list: &Path,
     verbose: bool,
-) -> Result<()> {
-    let extra_args = &[
-        "-unexported_symbols_list".to_owned(),
-        filter_list.to_str().unwrap().to_owned(),
-    ];
+) -> Result<(), MergeError> {
+    let extra_args = &["-unexported_symbols_list".as_ref(), filter_list.as_os_str()];
     let merged_firstpass_path = merged_path.parent().unwrap().join("merged_firstpass.o");
     create_merged_object(&merged_firstpass_path, extra_args, objects, verbose)?;
     create_merged_object(merged_path, &[], &[&merged_firstpass_path], false)?;
@@ -47,14 +44,18 @@ pub fn create_symbol_filter_list(
     objects: impl IntoIterator<Item = impl AsRef<Path>>,
     keep_regexes: &[Regex],
     verbose: bool,
-) -> Result<PathBuf> {
+) -> Result<PathBuf, MergeError> {
     let filter_path = object_dir.join("localize.syms");
     let mut filter_syms = HashSet::new();
     let mut kept_count = 0;
 
     for object_path in objects.into_iter() {
+        let object_path = object_path.as_ref();
         let data = std::fs::read(object_path)?;
-        let file = object::File::parse(data.as_slice())?;
+        let file = object::File::parse(data.as_slice()).map_err(|e| MergeError::InvalidObject {
+            path: object_path.to_owned(),
+            inner: e,
+        })?;
         'next_symbol: for sym in file.symbols() {
             if !sym.is_global()
                 || sym.is_undefined()
@@ -84,7 +85,7 @@ pub fn create_symbol_filter_list(
         );
     }
 
-    let mut filter_file = std::fs::File::create(&filter_path)?;
+    let mut filter_file = File::create(&filter_path)?;
     for sym_name in filter_syms {
         filter_file.write_all(sym_name.as_bytes())?;
         filter_file.write_all(b"\n")?;
@@ -93,7 +94,11 @@ pub fn create_symbol_filter_list(
     Ok(filter_path)
 }
 
-fn filter_symbols(object_path: &Path, filter_list_path: &Path, verbose: bool) -> Result<()> {
+fn filter_symbols(
+    object_path: &Path,
+    filter_list_path: &Path,
+    verbose: bool,
+) -> Result<(), MergeError> {
     let objcopy_path = if let Some(var) = std::env::var_os("OBJCOPY") {
         var
     } else {
@@ -117,20 +122,22 @@ fn filter_symbols(object_path: &Path, filter_list_path: &Path, verbose: bool) ->
     }
 
     let output = Command::new(&objcopy_path)
-        .args(args)
+        .args(&args)
         .output()
-        .with_context(|| {
-            format!(
-                "Failed to run '{}' command to filter symbols",
-                objcopy_path.to_string_lossy()
-            )
+        .map_err(|e| MergeError::ExternalToolLaunchError {
+            tool: objcopy_path.to_string_lossy().to_string(),
+            inner: e,
         })?;
     if output.status.success() {
         Ok(())
     } else {
-        std::io::stdout().write_all(&output.stdout).unwrap();
-        std::io::stderr().write_all(&output.stderr).unwrap();
-        panic!("Failed to filter symbols with objcopy")
+        Err(MergeError::ExternalToolError {
+            reason: "Failed to filter symbols".to_string(),
+            tool: objcopy_path.to_string_lossy().to_string(),
+            args,
+            stdout: output.stdout,
+            stderr: output.stderr,
+        })
     }
 }
 
@@ -140,7 +147,7 @@ pub fn merge_required_macho_objects(
     objects: &HashMap<PathBuf, ObjectSyms>,
     keep_regexes: &[Regex],
     verbose: bool,
-) -> Result<()> {
+) -> Result<(), MergeError> {
     let filter_path = create_symbol_filter_list(obj_dir, objects.keys(), keep_regexes, verbose)?;
     create_filtered_merged_macho_object(merged_path, objects.keys(), &filter_path, verbose)
 }
@@ -151,7 +158,7 @@ pub fn merge_required_objects(
     objects: &HashMap<PathBuf, ObjectSyms>,
     keep_regexes: &[Regex],
     verbose: bool,
-) -> Result<()> {
+) -> Result<(), MergeError> {
     let filter_path = create_symbol_filter_list(obj_dir, objects.keys(), keep_regexes, verbose)?;
     create_filtered_merged_object(merged_path, objects.keys(), &filter_path, verbose)?;
 
@@ -161,15 +168,19 @@ pub fn merge_required_objects(
     demote_elf_comdats(merged_path, keep_regexes, verbose)
 }
 
-fn demote_elf_comdats(merged_path: &Path, keep_regexes: &[Regex], verbose: bool) -> Result<()> {
+fn demote_elf_comdats(
+    merged_path: &Path,
+    keep_regexes: &[Regex],
+    verbose: bool,
+) -> Result<(), MergeError> {
     let mut file = File::open(merged_path)?;
     let hint_bytes = &mut [0u8; 16];
     file.read_exact(hint_bytes)?;
     file.seek(SeekFrom::Start(0))?;
 
     let new_data = {
-        match peek_bytes(hint_bytes)? {
-            Hint::Elf(_) => {
+        match peek_bytes(hint_bytes) {
+            Ok(Hint::Elf(_)) => {
                 if verbose {
                     println!(
                         "Automatically demoting ELF COMDAT section groups in {}",
@@ -179,12 +190,14 @@ fn demote_elf_comdats(merged_path: &Path, keep_regexes: &[Regex], verbose: bool)
 
                 let mut data = Vec::new();
                 file.read_to_end(&mut data)?;
-                objpoke::elf::demote_comdat_groups(data, keep_regexes).map_err(|e| anyhow!(e))?
+                objpoke::elf::demote_comdat_groups(data, keep_regexes)
+                    .map_err(|e| MergeError::InternalError(e.into()))?
             }
             // We don't know about needing to demote any COMDATs in PE/Mach-O files
-            Hint::Mach(_) | Hint::MachFat(_) => return Ok(()),
-            Hint::PE => return Ok(()),
-            _ => return Ok(()),
+            Ok(Hint::Mach(_) | Hint::MachFat(_)) => return Ok(()),
+            Ok(Hint::PE) => return Ok(()),
+            Ok(_) => return Ok(()),
+            Err(_) => return Ok(()), // Goblin probably just doesn't understand this format
         }
     };
 

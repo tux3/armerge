@@ -1,8 +1,8 @@
+use crate::MergeError;
 use object::{Object, ObjectSymbol, SymbolKind};
 use rayon::prelude::*;
 use regex::Regex;
 use std::collections::{HashMap, HashSet};
-use std::error::Error;
 use std::path::{Path, PathBuf};
 
 pub struct ObjectSyms {
@@ -14,14 +14,17 @@ pub struct ObjectSyms {
 }
 
 impl ObjectSyms {
-    pub fn new(object_path: &Path, keep_regexes: &[Regex]) -> Result<Self, Box<dyn Error>> {
+    pub fn new(object_path: &Path, keep_regexes: &[Regex]) -> Result<Self, MergeError> {
         let mut globals = HashSet::new();
         let mut undefineds = HashSet::new();
         let mut kept_syms_list = String::new();
         let mut has_exported_symbols = false;
 
         let data = std::fs::read(object_path)?;
-        let file = object::File::parse(data.as_slice())?;
+        let file = object::File::parse(data.as_slice()).map_err(|e| MergeError::InvalidObject {
+            path: object_path.to_owned(),
+            inner: e,
+        })?;
         for sym in file.symbols() {
             if sym.kind() != SymbolKind::Text
                 && sym.kind() != SymbolKind::Data

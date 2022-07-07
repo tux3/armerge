@@ -8,8 +8,7 @@ mod system_filter;
 
 use crate::arbuilder::ArBuilder;
 use crate::objects::syms::ObjectSyms;
-use crate::ArchiveContents;
-use anyhow::Result;
+use crate::{ArchiveContents, MergeError};
 use regex::Regex;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -27,7 +26,7 @@ pub fn merge_required_objects(
     objs: &HashMap<PathBuf, ObjectSyms>,
     keeps: &[Regex],
     verbose: bool,
-) -> Result<()> {
+) -> Result<(), MergeError> {
     #[allow(clippy::if_same_then_else)] // Clippy can't see both [cfg] at once
     if contents_type == ArchiveContents::Elf {
         #[cfg(feature = "objpoke_symbols")]
@@ -46,33 +45,28 @@ pub fn merge(
     mut output: Box<dyn ArBuilder>,
     contents_type: ArchiveContents,
     objects: ObjectTempDir,
-    keep_regexes: Vec<String>,
+    mut keep_regexes: Vec<Regex>,
     verbose: bool,
-) -> Result<()> {
+) -> Result<(), MergeError> {
     let merged_name = "merged.o";
     let mut merged_path = objects.dir.path().to_owned();
     merged_path.push(merged_name);
 
-    let mut keep_regexes = keep_regexes
-        .into_iter()
-        .map(|r| Regex::new(&r))
-        .collect::<Result<Vec<_>, _>>()?;
-
     // When filtering symbols to keep just the public API visible,
     // we must make an exception for the unwind symbols (if linked statically)
-    keep_regexes.push(Regex::new("^_?_Unwind_.*")?);
+    keep_regexes.push(Regex::new("^_?_Unwind_.*").expect("Failed to compile Regex"));
 
     let required_objects =
-        filter_deps::filter_required_objects(&objects.objects, &keep_regexes, verbose);
+        filter_deps::filter_required_objects(&objects.objects, &keep_regexes, verbose)?;
 
     if required_objects.is_empty() {
-        panic!("Zero objects left after filtering! Make sure to keep at least one public symbol.");
+        return Err(MergeError::NoObjectsLeft);
     }
 
     // When filtering symbols to keep just the public API visible,
     // we must make an exception for the unwind symbols (if linked statically)
     // However, some symbols are not indicative of the fact that we need to keep an object file
-    keep_regexes.push(Regex::new("_?__g.._personality_.*")?);
+    keep_regexes.push(Regex::new("_?__g.._personality_.*").expect("Failed to compile Regex"));
 
     merge_required_objects(
         contents_type,

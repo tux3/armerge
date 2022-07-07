@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
+use crate::MergeError;
 use rayon::iter::IntoParallelIterator;
 use rayon::prelude::*;
 use regex::Regex;
@@ -23,24 +24,16 @@ pub fn filter_required_objects(
     objects: &[PathBuf],
     keep_regexes: &[Regex],
     verbose: bool,
-) -> HashMap<PathBuf, ObjectSyms> {
+) -> Result<HashMap<PathBuf, ObjectSyms>, MergeError> {
     let mut object_syms = objects
         .into_par_iter()
         .map(|obj_path| {
-            (
+            Ok::<_, MergeError>((
                 obj_path.to_owned(),
-                ObjectSyms::new(obj_path, keep_regexes)
-                    .map_err(|e| {
-                        Box::new(format!(
-                            "Failed to open object {}: {}",
-                            obj_path.display(),
-                            e
-                        ))
-                    })
-                    .unwrap(),
-            )
+                ObjectSyms::new(obj_path, keep_regexes)?,
+            ))
         })
-        .collect::<HashMap<PathBuf, ObjectSyms>>();
+        .collect::<Result<HashMap<PathBuf, ObjectSyms>, _>>()?;
     ObjectSyms::check_dependencies(&mut object_syms);
 
     let mut required_objs = HashSet::new();
@@ -72,8 +65,8 @@ pub fn filter_required_objects(
         }
     }
 
-    object_syms
+    Ok(object_syms
         .into_iter()
         .filter(|(obj_path, _)| required_objs.contains(obj_path))
-        .collect()
+        .collect())
 }

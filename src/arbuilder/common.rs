@@ -1,7 +1,7 @@
 use crate::arbuilder::ArBuilder;
-use crate::archives;
-use anyhow::Result;
+use crate::{archives, MergeError};
 use ar::Builder;
+use std::fmt::{Debug, Formatter};
 use std::fs::File;
 use std::path::{Path, PathBuf};
 
@@ -12,28 +12,40 @@ pub struct CommonArBuilder {
     verbose: bool,
 }
 
+impl Debug for CommonArBuilder {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CommonArBuilder")
+            .field("output_path", &self.output_path)
+            .field("closed", &self.closed)
+            .finish()
+    }
+}
+
 impl ArBuilder for CommonArBuilder {
-    fn append_obj(&mut self, path: &Path) -> Result<()> {
-        self.builder.append_path(path)?;
+    fn append_obj(&mut self, path: &Path) -> Result<(), MergeError> {
+        self.builder
+            .append_path(path)
+            .map_err(MergeError::WritingArchive)?;
         Ok(())
     }
 
-    fn close(mut self: Box<Self>) -> Result<()> {
+    fn close(mut self: Box<Self>) -> Result<(), MergeError> {
         self.finalize_index()
     }
 }
 
 impl CommonArBuilder {
-    pub fn new(path: &Path, verbose: bool) -> Self {
+    pub fn new(path: impl Into<PathBuf>, verbose: bool) -> Self {
+        let path = path.into();
         Self {
-            builder: Builder::new(File::create(path).expect("Failed to create output library")),
-            output_path: path.to_owned(),
+            builder: Builder::new(File::create(&path).expect("Failed to create output library")),
+            output_path: path,
             closed: false,
             verbose,
         }
     }
 
-    fn finalize_index(&mut self) -> Result<()> {
+    fn finalize_index(&mut self) -> Result<(), MergeError> {
         if self.closed {
             return Ok(());
         }
