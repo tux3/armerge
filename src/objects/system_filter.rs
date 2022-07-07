@@ -12,15 +12,15 @@ use crate::MergeError;
 use object::{Object, ObjectSymbol, SymbolKind};
 use regex::Regex;
 use std::fs::File;
+use tracing::info;
 
 pub fn create_filtered_merged_object(
     merged_path: &Path,
     objects: impl IntoIterator<Item = impl AsRef<Path>>,
     filter_list: &Path,
-    verbose: bool,
 ) -> Result<(), MergeError> {
-    create_merged_object(merged_path, &[], objects, verbose)?;
-    filter_symbols(merged_path, filter_list, verbose)?;
+    create_merged_object(merged_path, &[], objects, false)?;
+    filter_symbols(merged_path, filter_list)?;
 
     Ok(())
 }
@@ -29,12 +29,11 @@ fn create_filtered_merged_macho_object(
     merged_path: &Path,
     objects: impl IntoIterator<Item = impl AsRef<Path>>,
     filter_list: &Path,
-    verbose: bool,
 ) -> Result<(), MergeError> {
     let extra_args = &["-unexported_symbols_list".as_ref(), filter_list.as_os_str()];
     let merged_firstpass_path = merged_path.parent().unwrap().join("merged_firstpass.o");
-    create_merged_object(&merged_firstpass_path, extra_args, objects, verbose)?;
-    create_merged_object(merged_path, &[], &[&merged_firstpass_path], false)?;
+    create_merged_object(&merged_firstpass_path, extra_args, objects, false)?;
+    create_merged_object(merged_path, &[], &[&merged_firstpass_path], true)?;
 
     Ok(())
 }
@@ -43,7 +42,6 @@ pub fn create_symbol_filter_list(
     object_dir: &Path,
     objects: impl IntoIterator<Item = impl AsRef<Path>>,
     keep_regexes: &[Regex],
-    verbose: bool,
 ) -> Result<PathBuf, MergeError> {
     let filter_path = object_dir.join("localize.syms");
     let mut filter_syms = HashSet::new();
@@ -77,13 +75,11 @@ pub fn create_symbol_filter_list(
             }
         }
     }
-    if verbose {
-        println!(
-            "Localizing {} symbols, keeping {} globals",
-            filter_syms.len(),
-            kept_count
-        );
-    }
+    info!(
+        "Localizing {} symbols, keeping {} globals",
+        filter_syms.len(),
+        kept_count
+    );
 
     let mut filter_file = File::create(&filter_path)?;
     for sym_name in filter_syms {
@@ -94,11 +90,7 @@ pub fn create_symbol_filter_list(
     Ok(filter_path)
 }
 
-fn filter_symbols(
-    object_path: &Path,
-    filter_list_path: &Path,
-    verbose: bool,
-) -> Result<(), MergeError> {
+fn filter_symbols(object_path: &Path, filter_list_path: &Path) -> Result<(), MergeError> {
     let objcopy_path = if let Some(var) = std::env::var_os("OBJCOPY") {
         var
     } else {
@@ -110,16 +102,14 @@ fn filter_symbols(
         filter_list_path.as_os_str().to_owned(),
         object_path.as_os_str().to_owned(),
     ];
-    if verbose {
-        println!(
-            "{} {}",
-            objcopy_path.to_string_lossy(),
-            args.iter()
-                .map(|s| s.to_string_lossy())
-                .collect::<Vec<_>>()
-                .join(" ")
-        );
-    }
+    info!(
+        "{} {}",
+        objcopy_path.to_string_lossy(),
+        args.iter()
+            .map(|s| s.to_string_lossy())
+            .collect::<Vec<_>>()
+            .join(" ")
+    );
 
     let output = Command::new(&objcopy_path)
         .args(&args)
@@ -146,10 +136,9 @@ pub fn merge_required_macho_objects(
     merged_path: &Path,
     objects: &HashMap<PathBuf, ObjectSyms>,
     keep_regexes: &[Regex],
-    verbose: bool,
 ) -> Result<(), MergeError> {
-    let filter_path = create_symbol_filter_list(obj_dir, objects.keys(), keep_regexes, verbose)?;
-    create_filtered_merged_macho_object(merged_path, objects.keys(), &filter_path, verbose)
+    let filter_path = create_symbol_filter_list(obj_dir, objects.keys(), keep_regexes)?;
+    create_filtered_merged_macho_object(merged_path, objects.keys(), &filter_path)
 }
 
 pub fn merge_required_objects(
@@ -157,22 +146,17 @@ pub fn merge_required_objects(
     merged_path: &Path,
     objects: &HashMap<PathBuf, ObjectSyms>,
     keep_regexes: &[Regex],
-    verbose: bool,
 ) -> Result<(), MergeError> {
-    let filter_path = create_symbol_filter_list(obj_dir, objects.keys(), keep_regexes, verbose)?;
-    create_filtered_merged_object(merged_path, objects.keys(), &filter_path, verbose)?;
+    let filter_path = create_symbol_filter_list(obj_dir, objects.keys(), keep_regexes)?;
+    create_filtered_merged_object(merged_path, objects.keys(), &filter_path)?;
 
     // If a symbol we localize is in a COMDAT section group, we also want to turn it into a regular
     // section group. Otherwise the local symbol is not really local, because the containing section
     // could later get COMDAT-folded with other (potentially incompatible) object files.
-    demote_elf_comdats(merged_path, keep_regexes, verbose)
+    demote_elf_comdats(merged_path, keep_regexes)
 }
 
-fn demote_elf_comdats(
-    merged_path: &Path,
-    keep_regexes: &[Regex],
-    verbose: bool,
-) -> Result<(), MergeError> {
+fn demote_elf_comdats(merged_path: &Path, keep_regexes: &[Regex]) -> Result<(), MergeError> {
     let mut file = File::open(merged_path)?;
     let hint_bytes = &mut [0u8; 16];
     file.read_exact(hint_bytes)?;
@@ -181,12 +165,10 @@ fn demote_elf_comdats(
     let new_data = {
         match peek_bytes(hint_bytes) {
             Ok(Hint::Elf(_)) => {
-                if verbose {
-                    println!(
-                        "Automatically demoting ELF COMDAT section groups in {}",
-                        merged_path.display()
-                    )
-                }
+                info!(
+                    "Automatically demoting ELF COMDAT section groups in {}",
+                    merged_path.display()
+                );
 
                 let mut data = Vec::new();
                 file.read_to_end(&mut data)?;

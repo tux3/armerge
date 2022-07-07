@@ -3,12 +3,13 @@ use std::ffi::{OsStr, OsString};
 use std::path::Path;
 use std::process::Command;
 use std::str::FromStr;
+use tracing::{debug, info};
 
 pub fn create_merged_object(
     merged_path: &Path,
     extra_args: &[&OsStr],
     objects: impl IntoIterator<Item = impl AsRef<Path>>,
-    verbose: bool,
+    silent: bool,
 ) -> Result<(), MergeError> {
     let ldflags = if let Ok(ldflags) = std::env::var("ARMERGE_LDFLAGS") {
         ldflags.split(' ').map(OsString::from).collect::<Vec<_>>()
@@ -37,15 +38,25 @@ pub fn create_merged_object(
             .inspect(|_| count += 1)
             .map(|p| p.as_ref().as_os_str().into()),
     );
-    if verbose {
-        println!(
+
+    let trace_args = args
+        .iter()
+        .map(|s| s.to_string_lossy())
+        .collect::<Vec<_>>()
+        .join(" ");
+    if silent {
+        debug!(
             "Merging {} objects: {} {}",
             count,
             &ld_path.to_string_lossy(),
-            args.iter()
-                .map(|s| s.to_string_lossy())
-                .collect::<Vec<_>>()
-                .join(" ")
+            trace_args
+        );
+    } else {
+        info!(
+            "Merging {} objects: {} {}",
+            count,
+            &ld_path.to_string_lossy(),
+            trace_args
         );
     }
 

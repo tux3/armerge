@@ -3,6 +3,9 @@ use regex::Regex;
 use std::error::Error;
 use std::path::PathBuf;
 use structopt::StructOpt;
+use tracing::{error, Level};
+use tracing_subscriber::filter::Directive;
+use tracing_subscriber::fmt::time::UtcTime;
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "armerge")]
@@ -24,14 +27,35 @@ struct Opt {
     inputs: Vec<PathBuf>,
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
+fn main() {
+    if std::env::var("RUST_LIB_BACKTRACE").is_err() {
+        std::env::set_var("RUST_LIB_BACKTRACE", "1")
+    }
+    if std::env::var("RUST_LOG").is_err() {
+        std::env::set_var("RUST_LOG", "warn")
+    }
+
     let opt = Opt::from_args();
+    let mut filter = tracing_subscriber::EnvFilter::from_default_env();
+    if opt.verbose {
+        filter = filter.add_directive(Directive::from(Level::INFO));
+    }
+    let time_format = time::format_description::parse("[hour]:[minute]:[second]").unwrap();
+    tracing_subscriber::fmt::fmt()
+        .with_timer(UtcTime::new(time_format))
+        .with_env_filter(filter)
+        .init();
+
+    if let Err(e) = err_main(opt) {
+        error!("{}", e);
+        std::process::exit(1);
+    }
+}
+
+fn err_main(opt: Opt) -> Result<(), Box<dyn Error>> {
     if opt.inputs.is_empty() {
         return Err("No input file specified".to_string().into());
     }
-
-    // TODO: Handle verbose option again
-    let _ = opt.verbose;
 
     let merger = ArMerger::new_from_paths(&opt.inputs, &opt.output)?;
 

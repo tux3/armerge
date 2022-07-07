@@ -11,6 +11,7 @@ use std::fmt::{Debug, Formatter};
 use std::fs::File;
 use std::io::{Read, Write};
 use tempdir::TempDir;
+use tracing::info;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum ArchiveContents {
@@ -114,12 +115,10 @@ pub fn extract_objects<I: IntoIterator<Item = InputLibrary<R>>, R: Read>(
     })
 }
 
-pub fn create_index(archive_path: &std::path::Path, verbose: bool) -> Result<(), MergeError> {
+pub fn create_index(archive_path: &std::path::Path) -> Result<(), MergeError> {
     use std::process::Command;
 
-    if verbose {
-        println!("ranlib {}", archive_path.to_string_lossy());
-    }
+    info!("ranlib {}", archive_path.to_string_lossy());
 
     let output = Command::new("ranlib")
         .args(vec![archive_path])

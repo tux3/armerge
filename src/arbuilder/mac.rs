@@ -4,12 +4,12 @@ use crate::MergeError::ExternalToolLaunchError;
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use tracing::info;
 
 #[derive(Debug)]
 pub struct MacArBuilder {
     output_path: PathBuf,
     obj_paths: Vec<PathBuf>,
-    verbose: bool,
     closed: bool,
 }
 
@@ -25,11 +25,10 @@ impl ArBuilder for MacArBuilder {
 }
 
 impl MacArBuilder {
-    pub fn new(path: &Path, verbose: bool) -> Self {
+    pub fn new(path: &Path) -> Self {
         Self {
             output_path: path.to_owned(),
             obj_paths: vec![],
-            verbose,
             closed: false,
         }
     }
@@ -53,16 +52,15 @@ impl MacArBuilder {
                 .inspect(|_| count += 1)
                 .map(|p| p.as_os_str().into()),
         );
-        if self.verbose {
-            println!(
-                "Merging {} objects: libtool {}",
-                count,
-                args.iter()
-                    .map(|s| s.to_string_lossy())
-                    .collect::<Vec<_>>()
-                    .join(" ")
-            );
-        }
+
+        info!(
+            "Merging {} objects: libtool {}",
+            count,
+            args.iter()
+                .map(|s| s.to_string_lossy())
+                .collect::<Vec<_>>()
+                .join(" ")
+        );
 
         let output =
             Command::new("libtool")

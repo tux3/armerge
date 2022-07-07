@@ -10,10 +10,10 @@ pub trait ArBuilder: Debug {
     fn close(self: Box<Self>) -> Result<(), MergeError>;
 }
 
-pub fn host_platform_builder(path: &Path, verbose: bool) -> Box<dyn ArBuilder> {
+pub fn host_platform_builder(path: &Path) -> Box<dyn ArBuilder> {
     if std::env::consts::OS == "macos" {
-        Box::new(mac::MacArBuilder::new(path, verbose))
+        Box::new(mac::MacArBuilder::new(path))
     } else {
-        Box::new(common::CommonArBuilder::new(path, verbose))
+        Box::new(common::CommonArBuilder::new(path))
     }
 }

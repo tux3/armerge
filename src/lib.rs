@@ -16,6 +16,7 @@ use regex::Regex;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
+use tracing::error;
 
 #[derive(Debug)]
 pub struct ArMerger {
@@ -66,15 +67,15 @@ impl ArMerger {
     ) -> Result<Box<dyn ArBuilder>, ProcessInputError> {
         Ok(match contents_type {
             ArchiveContents::Empty => return Err(ProcessInputError::Empty),
-            ArchiveContents::Elf => Box::new(CommonArBuilder::new(output.as_ref(), false)),
-            ArchiveContents::MachO => Box::new(MacArBuilder::new(output.as_ref(), false)),
+            ArchiveContents::Elf => Box::new(CommonArBuilder::new(output.as_ref())),
+            ArchiveContents::MachO => Box::new(MacArBuilder::new(output.as_ref())),
             ArchiveContents::Other => {
-                eprintln!("Input archives contain neither ELF nor Mach-O files, trying to continue with your host toolchain");
-                arbuilder::host_platform_builder(output.as_ref(), false)
+                error!("Input archives contain neither ELF nor Mach-O files, trying to continue with your host toolchain");
+                arbuilder::host_platform_builder(output.as_ref())
             }
             ArchiveContents::Mixed => {
-                eprintln!("Input archives contain different object file formats, trying to continue with your host toolchain");
-                arbuilder::host_platform_builder(output.as_ref(), false)
+                error!("Input archives contain different object file formats, trying to continue with your host toolchain");
+                arbuilder::host_platform_builder(output.as_ref())
             }
         })
     }
@@ -100,7 +101,6 @@ impl ArMerger {
             self.extracted.contents_type,
             self.extracted.object_dir,
             keep_symbols_regexes.into_iter().collect(),
-            false,
         )
     }
 }

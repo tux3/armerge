@@ -9,7 +9,6 @@ pub struct CommonArBuilder {
     builder: Builder<File>,
     output_path: PathBuf,
     closed: bool,
-    verbose: bool,
 }
 
 impl Debug for CommonArBuilder {
@@ -35,13 +34,12 @@ impl ArBuilder for CommonArBuilder {
 }
 
 impl CommonArBuilder {
-    pub fn new(path: impl Into<PathBuf>, verbose: bool) -> Self {
+    pub fn new(path: impl Into<PathBuf>) -> Self {
         let path = path.into();
         Self {
             builder: Builder::new(File::create(&path).expect("Failed to create output library")),
             output_path: path,
             closed: false,
-            verbose,
         }
     }
 
@@ -51,6 +49,6 @@ impl CommonArBuilder {
         }
         self.closed = true;
 
-        archives::create_index(&self.output_path, self.verbose)
+        archives::create_index(&self.output_path)
     }
 }

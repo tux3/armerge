@@ -11,10 +11,9 @@ pub fn merge_required_objects(
     merged_path: &Path,
     objects: &HashMap<PathBuf, ObjectSyms>,
     keep_regexes: &[Regex],
-    verbose: bool,
 ) -> Result<(), MergeError> {
     // The merging part is still not builtin, it has to be done by a real linker
-    merge::create_merged_object(merged_path, &[], objects.keys(), verbose)?;
+    merge::create_merged_object(merged_path, &[], objects.keys(), false)?;
 
     // Filtering the symbols is faster in pure Rust, compared to calling the system's objcopy
     let merged_elf = std::fs::read(merged_path)?;

@@ -25,18 +25,17 @@ pub fn merge_required_objects(
     merged_path: &Path,
     objs: &HashMap<PathBuf, ObjectSyms>,
     keeps: &[Regex],
-    verbose: bool,
 ) -> Result<(), MergeError> {
     #[allow(clippy::if_same_then_else)] // Clippy can't see both [cfg] at once
     if contents_type == ArchiveContents::Elf {
         #[cfg(feature = "objpoke_symbols")]
-        builtin_filter::merge_required_objects(obj_dir, merged_path, objs, keeps, verbose)?;
+        builtin_filter::merge_required_objects(obj_dir, merged_path, objs, keeps)?;
         #[cfg(not(feature = "objpoke_symbols"))]
-        system_filter::merge_required_objects(obj_dir, merged_path, objs, keeps, verbose)?;
+        system_filter::merge_required_objects(obj_dir, merged_path, objs, keeps)?;
     } else if contents_type == ArchiveContents::MachO {
-        system_filter::merge_required_macho_objects(obj_dir, merged_path, objs, keeps, verbose)?;
+        system_filter::merge_required_macho_objects(obj_dir, merged_path, objs, keeps)?;
     } else {
-        system_filter::merge_required_objects(obj_dir, merged_path, objs, keeps, verbose)?;
+        system_filter::merge_required_objects(obj_dir, merged_path, objs, keeps)?;
     }
     Ok(())
 }
@@ -46,7 +45,6 @@ pub fn merge(
     contents_type: ArchiveContents,
     objects: ObjectTempDir,
     mut keep_regexes: Vec<Regex>,
-    verbose: bool,
 ) -> Result<(), MergeError> {
     let merged_name = "merged.o";
     let mut merged_path = objects.dir.path().to_owned();
@@ -56,8 +54,7 @@ pub fn merge(
     // we must make an exception for the unwind symbols (if linked statically)
     keep_regexes.push(Regex::new("^_?_Unwind_.*").expect("Failed to compile Regex"));
 
-    let required_objects =
-        filter_deps::filter_required_objects(&objects.objects, &keep_regexes, verbose)?;
+    let required_objects = filter_deps::filter_required_objects(&objects.objects, &keep_regexes)?;
 
     if required_objects.is_empty() {
         return Err(MergeError::NoObjectsLeft);
@@ -74,7 +71,6 @@ pub fn merge(
         &merged_path,
         &required_objects,
         &keep_regexes,
-        verbose,
     )?;
 
     output.append_obj(&merged_path)?;
