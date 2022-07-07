@@ -11,18 +11,21 @@ env:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
-
     steps:
     - uses: actions/checkout@v3
-    - name: Build (bin)
-      run: cargo build --verbose
     - name: Build (lib)
-      run: cargo build --lib --no-default-features --verbose
+      run: cargo build --lib --no-default-features
+    - name: Build (bin)
+      run: cargo build --all
+  clippy:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
     - name: Clippy
       run: cargo clippy --all --all-targets -- -D warnings
     - name: Clippy (no features)
       run: cargo clippy --all --all-targets --no-default-features -- -D warnings
     - name: Clippy (all features)
       run: cargo clippy --all --all-targets --all-features -- -D warnings
+
