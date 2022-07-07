@@ -31,7 +31,7 @@ impl ArMerger {
         output: O,
     ) -> Result<Self, ProcessInputError> {
         let extracted = archives::extract_objects(input_libs)?;
-        let builder = Self::create_builder(extracted.contents_type, output)?;
+        let builder = Self::create_ar_builder(extracted.contents_type, output)?;
         Ok(Self { extracted, builder })
     }
 
@@ -61,7 +61,7 @@ impl ArMerger {
         Self::new(libs?, output_path)
     }
 
-    fn create_builder<P: AsRef<Path>>(
+    fn create_ar_builder<P: AsRef<Path>>(
         contents_type: ArchiveContents,
         output: P,
     ) -> Result<Box<dyn ArBuilder>, ProcessInputError> {
