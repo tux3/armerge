@@ -6,7 +6,11 @@ use thiserror::Error;
 /// Errors that happen while creating the merged output static library from the extracted inputs
 #[derive(Debug, Error)]
 pub enum MergeError {
-    #[error("{reason}: {tool:?} {args:?})")]
+    #[error(
+        "{reason}: {tool:?} {args:?})\nstdout: {}\nstderr: {}",
+        String::from_utf8_lossy(stdout),
+        String::from_utf8_lossy(stderr)
+    )]
     ExternalToolError {
         reason: String,
         tool: String,
