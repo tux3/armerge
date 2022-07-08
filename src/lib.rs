@@ -12,6 +12,7 @@ use crate::archives::{ArchiveContents, ExtractedArchive};
 pub use crate::input_library::InputLibrary;
 use crate::merge_error::MergeError;
 use crate::process_input_error::ProcessInputError;
+use rayon::prelude::*;
 use regex::Regex;
 use std::fs::File;
 use std::io::Read;
@@ -26,7 +27,7 @@ pub struct ArMerger {
 
 impl ArMerger {
     /// Open and extract the contents of the input static libraries
-    pub fn new<I: IntoIterator<Item = InputLibrary<R>>, R: Read, O: AsRef<Path>>(
+    pub fn new<I: IntoParallelIterator<Item = InputLibrary<R>>, R: Read, O: AsRef<Path>>(
         input_libs: I,
         output: O,
     ) -> Result<Self, ProcessInputError> {

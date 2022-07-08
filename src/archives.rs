@@ -7,6 +7,7 @@ use ar::Archive;
 use goblin::{peek_bytes, Hint};
 use rand::distributions::{Alphanumeric, DistString};
 use rand::thread_rng;
+use rayon::prelude::*;
 use std::fmt::{Debug, Formatter};
 use std::fs::File;
 use std::io::{Read, Write};
@@ -25,6 +26,23 @@ pub enum ArchiveContents {
     Mixed,
     /// No contents
     Empty,
+}
+
+impl ArchiveContents {
+    pub(crate) fn merge(a: ArchiveContents, b: ArchiveContents) -> ArchiveContents {
+        #[allow(clippy::if_same_then_else)] // Two of the cases return `a`, that's okay
+        if a == ArchiveContents::Mixed || b == ArchiveContents::Mixed {
+            ArchiveContents::Mixed
+        } else if a == ArchiveContents::Empty {
+            b
+        } else if b == ArchiveContents::Empty {
+            a
+        } else if a == b {
+            a
+        } else {
+            ArchiveContents::Mixed
+        }
+    }
 }
 
 pub struct ExtractedArchive {
@@ -50,66 +68,77 @@ fn archive_object_type(object_header: &[u8; 16]) -> ArchiveContents {
     }
 }
 
-pub fn extract_objects<I: IntoIterator<Item = InputLibrary<R>>, R: Read>(
+pub fn extract_objects<I: IntoParallelIterator<Item = InputLibrary<R>>, R: Read>(
     input_libraries: I,
 ) -> Result<ExtractedArchive, ProcessInputError> {
     let dir = tempfile::Builder::new()
         .prefix("armerge.")
         .tempdir()
         .map_err(ProcessInputError::TempDir)?;
-    let mut objects = Vec::new();
-    let mut archive_contents = ArchiveContents::Empty;
 
-    for input_lib in input_libraries {
-        let mut archive = Archive::new(input_lib.reader);
-        while let Some(entry_result) = archive.next_entry() {
-            let mut entry = entry_result.map_err(|e| ProcessInputError::ReadingArchive {
-                name: input_lib.name.clone(),
-                inner: e,
-            })?;
+    let (objects, archive_contents) = input_libraries
+        .into_par_iter()
+        .try_fold(
+            || (Vec::new(), ArchiveContents::Empty),
+            |(mut objects, mut archive_contents), input_lib| {
+                let mut archive = Archive::new(input_lib.reader);
+                while let Some(entry_result) = archive.next_entry() {
+                    let mut entry =
+                        entry_result.map_err(|e| ProcessInputError::ReadingArchive {
+                            name: input_lib.name.clone(),
+                            inner: e,
+                        })?;
 
-            let rnd: String = Alphanumeric.sample_string(&mut thread_rng(), 8);
-            let mut obj_path = dir.path().to_owned();
-            obj_path.push(format!(
-                "{}@{}.{}.o",
-                input_lib.name,
-                String::from_utf8_lossy(entry.header().identifier()),
-                &rnd
-            ));
+                    let rnd: String = Alphanumeric.sample_string(&mut thread_rng(), 8);
+                    let mut obj_path = dir.path().to_owned();
+                    obj_path.push(format!(
+                        "{}@{}.{}.o",
+                        input_lib.name,
+                        String::from_utf8_lossy(entry.header().identifier()),
+                        &rnd
+                    ));
 
-            let hint_bytes = &mut [0u8; 16];
-            entry
-                .read_exact(hint_bytes)
-                .map_err(|e| ProcessInputError::ReadingArchive {
-                    name: input_lib.name.clone(),
-                    inner: e,
-                })?;
-            let obj_type = archive_object_type(hint_bytes);
-            if archive_contents == ArchiveContents::Empty {
-                archive_contents = obj_type;
-            } else if archive_contents != obj_type {
-                archive_contents = ArchiveContents::Mixed
-            }
+                    let hint_bytes = &mut [0u8; 16];
+                    entry.read_exact(hint_bytes).map_err(|e| {
+                        ProcessInputError::ReadingArchive {
+                            name: input_lib.name.clone(),
+                            inner: e,
+                        }
+                    })?;
+                    let obj_type = archive_object_type(hint_bytes);
+                    archive_contents = ArchiveContents::merge(archive_contents, obj_type);
 
-            let mut file =
-                File::create(&obj_path).map_err(|e| ProcessInputError::ExtractingObject {
-                    path: obj_path.to_owned(),
-                    inner: e,
-                })?;
-            file.write_all(hint_bytes)
-                .map_err(|e| ProcessInputError::ExtractingObject {
-                    path: obj_path.to_owned(),
-                    inner: e,
-                })?;
-            std::io::copy(&mut entry, &mut file).map_err(|e| {
-                ProcessInputError::ExtractingObject {
-                    path: obj_path.to_owned(),
-                    inner: e,
+                    let mut file = File::create(&obj_path).map_err(|e| {
+                        ProcessInputError::ExtractingObject {
+                            path: obj_path.to_owned(),
+                            inner: e,
+                        }
+                    })?;
+                    file.write_all(hint_bytes).map_err(|e| {
+                        ProcessInputError::ExtractingObject {
+                            path: obj_path.to_owned(),
+                            inner: e,
+                        }
+                    })?;
+                    std::io::copy(&mut entry, &mut file).map_err(|e| {
+                        ProcessInputError::ExtractingObject {
+                            path: obj_path.to_owned(),
+                            inner: e,
+                        }
+                    })?;
+                    objects.push(obj_path);
                 }
-            })?;
-            objects.push(obj_path);
-        }
-    }
+
+                Ok((objects, archive_contents))
+            },
+        )
+        .try_reduce(
+            || (Vec::new(), ArchiveContents::Empty),
+            |(mut objs_a, contents_a), (mut objs_b, contents_b)| {
+                objs_a.append(&mut objs_b);
+                Ok((objs_a, ArchiveContents::merge(contents_a, contents_b)))
+            },
+        )?;
 
     Ok(ExtractedArchive {
         object_dir: ObjectTempDir { dir, objects },
