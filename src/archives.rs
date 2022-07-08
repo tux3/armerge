@@ -10,7 +10,6 @@ use rand::thread_rng;
 use std::fmt::{Debug, Formatter};
 use std::fs::File;
 use std::io::{Read, Write};
-use tempdir::TempDir;
 use tracing::info;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -54,7 +53,10 @@ fn archive_object_type(object_header: &[u8; 16]) -> ArchiveContents {
 pub fn extract_objects<I: IntoIterator<Item = InputLibrary<R>>, R: Read>(
     input_libraries: I,
 ) -> Result<ExtractedArchive, ProcessInputError> {
-    let dir = TempDir::new("armerge").map_err(ProcessInputError::TempDir)?;
+    let dir = tempfile::Builder::new()
+        .prefix("armerge.")
+        .tempdir()
+        .map_err(ProcessInputError::TempDir)?;
     let mut objects = Vec::new();
     let mut archive_contents = ArchiveContents::Empty;
 

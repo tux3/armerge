@@ -12,7 +12,7 @@ use crate::{ArchiveContents, MergeError};
 use regex::Regex;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use tempdir::TempDir;
+use tempfile::TempDir;
 
 pub struct ObjectTempDir {
     pub dir: TempDir,
