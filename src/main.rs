@@ -14,6 +14,10 @@ struct Opt {
     #[structopt(short, long, number_of_values = 1)]
     keep_symbols: Vec<String>,
 
+    /// Accepts regexes of the symbol names to hide, and keep the rest global
+    #[structopt(short, long, number_of_values = 1)]
+    remove_symbols: Vec<String>,
+
     /// Output static library
     #[structopt(short, long, parse(from_os_str))]
     output: PathBuf,
@@ -59,17 +63,28 @@ fn err_main(opt: Opt) -> Result<(), Box<dyn Error>> {
 
     let merger = ArMerger::new_from_paths(&opt.inputs, &opt.output)?;
 
-    if opt.keep_symbols.is_empty() {
-        // If we don't need to localize any symbols, this is the easy case where we just extract
-        // contents and re-pack them, no linker necessary.
-        merger.merge_simple()?;
-    } else {
-        let keep_symbols: Vec<Regex> = opt
-            .keep_symbols
-            .into_iter()
-            .map(|s| Regex::new(&s))
-            .collect::<Result<Vec<_>, _>>()?;
-        merger.merge_and_localize(keep_symbols)?;
+    match (opt.keep_symbols.is_empty(), opt.remove_symbols.is_empty()) {
+        (true, true) => {
+            // If we don't need to localize any symbols, this is the easy case where we just extract
+            // contents and re-pack them, no linker necessary.
+            error!("simple");
+            merger.merge_simple()?;
+        },
+        (false, true) => {
+            error!("keep");
+            let keep_symbols: Vec<Regex> = opt
+                .keep_symbols
+                .into_iter()
+                .map(|s| Regex::new(&s))
+                .collect::<Result<Vec<_>, _>>()?;
+            merger.merge_and_localize(keep_symbols)?;
+        },
+        (true, false) => {
+            error!("remove symbols");
+        },
+        (false, false) => {
+            return Err("Can't have both keep-symbols and remove-symbols options at the same time".to_string().into());
+        }
     }
 
     Ok(())
