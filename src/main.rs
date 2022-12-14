@@ -1,4 +1,4 @@
-use armerge::ArMerger;
+use armerge::{ArmergeKeepOrRemove, ArMerger};
 use regex::Regex;
 use std::error::Error;
 use std::path::PathBuf;
@@ -67,20 +67,23 @@ fn err_main(opt: Opt) -> Result<(), Box<dyn Error>> {
         (true, true) => {
             // If we don't need to localize any symbols, this is the easy case where we just extract
             // contents and re-pack them, no linker necessary.
-            error!("simple");
             merger.merge_simple()?;
         },
         (false, true) => {
-            error!("keep");
             let keep_symbols: Vec<Regex> = opt
                 .keep_symbols
                 .into_iter()
                 .map(|s| Regex::new(&s))
                 .collect::<Result<Vec<_>, _>>()?;
-            merger.merge_and_localize(keep_symbols)?;
+            merger.merge_and_localize(ArmergeKeepOrRemove::KeepSymbols, keep_symbols)?;
         },
         (true, false) => {
-            error!("remove symbols");
+            let remove_symbols: Vec<Regex> = opt
+                .remove_symbols
+                .into_iter()
+                .map(|s| Regex::new(&s))
+                .collect::<Result<Vec<_>, _>>()?;
+            merger.merge_and_localize(ArmergeKeepOrRemove::RemoveSymbols, remove_symbols)?;
         },
         (false, false) => {
             return Err("Can't have both keep-symbols and remove-symbols options at the same time".to_string().into());

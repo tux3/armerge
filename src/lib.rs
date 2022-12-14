@@ -25,6 +25,12 @@ pub struct ArMerger {
     builder: Box<dyn ArBuilder>,
 }
 
+#[derive(PartialEq, Eq, Copy, Clone)]
+pub enum ArmergeKeepOrRemove {
+    KeepSymbols,
+    RemoveSymbols,
+}
+
 impl ArMerger {
     /// Open and extract the contents of the input static libraries
     pub fn new<I: IntoParallelIterator<Item = InputLibrary<R>>, R: Read, O: AsRef<Path>>(
@@ -95,13 +101,15 @@ impl ArMerger {
     /// `keep_symbols_regexes` contains the regex name pattern for public symbols to keep exported
     pub fn merge_and_localize<Iter: IntoIterator<Item = Regex>>(
         self,
-        keep_symbols_regexes: Iter,
+        keep_or_remove: ArmergeKeepOrRemove,
+        symbols_regexes: Iter,
     ) -> Result<(), MergeError> {
         objects::merge(
             self.builder,
             self.extracted.contents_type,
             self.extracted.object_dir,
-            keep_symbols_regexes.into_iter().collect(),
+            keep_or_remove,
+            symbols_regexes.into_iter().collect(),
         )
     }
 }

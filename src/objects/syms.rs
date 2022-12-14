@@ -1,4 +1,4 @@
-use crate::MergeError;
+use crate::{ArmergeKeepOrRemove, MergeError};
 use object::{Object, ObjectSymbol, SymbolKind};
 use rayon::prelude::*;
 use regex::Regex;
@@ -14,7 +14,11 @@ pub struct ObjectSyms {
 }
 
 impl ObjectSyms {
-    pub fn new(object_path: &Path, keep_regexes: &[Regex]) -> Result<Self, MergeError> {
+    pub fn new(
+        object_path: &Path,
+        keep_or_remove: ArmergeKeepOrRemove,
+        regexes: &[Regex],
+    ) -> Result<Self, MergeError> {
         let mut globals = HashSet::new();
         let mut undefineds = HashSet::new();
         let mut kept_syms_list = String::new();
@@ -46,8 +50,13 @@ impl ObjectSyms {
             }
 
             if let Ok(name) = sym.name() {
-                for regex in keep_regexes {
-                    if regex.is_match(name) {
+                for regex in regexes {
+                    let keep_sym_condition = if keep_or_remove == ArmergeKeepOrRemove::KeepSymbols {
+                        regex.is_match(name)
+                    } else {
+                        !regex.is_match(name)
+                    };
+                    if keep_sym_condition {
                         has_exported_symbols = true;
                         kept_syms_list += name;
                         kept_syms_list.push('\n');

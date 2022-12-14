@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
-use crate::MergeError;
+use crate::{ArmergeKeepOrRemove, MergeError};
 use rayon::iter::IntoParallelIterator;
 use rayon::prelude::*;
 use regex::Regex;
@@ -23,14 +23,15 @@ fn add_deps_recursive(
 
 pub fn filter_required_objects(
     objects: &[PathBuf],
-    keep_regexes: &[Regex],
+    keep_or_remove: ArmergeKeepOrRemove,
+    regexes: &[Regex],
 ) -> Result<HashMap<PathBuf, ObjectSyms>, MergeError> {
     let mut object_syms = objects
         .into_par_iter()
         .map(|obj_path| {
             Ok::<_, MergeError>((
                 obj_path.to_owned(),
-                ObjectSyms::new(obj_path, keep_regexes)?,
+                ObjectSyms::new(obj_path, keep_or_remove, regexes)?,
             ))
         })
         .collect::<Result<HashMap<PathBuf, ObjectSyms>, _>>()?;
