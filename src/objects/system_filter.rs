@@ -8,7 +8,7 @@ use std::str::FromStr;
 
 use crate::objects::merge::create_merged_object;
 use crate::objects::syms::ObjectSyms;
-use crate::MergeError;
+use crate::{ArmergeKeepOrRemove, MergeError};
 use object::{Object, ObjectSymbol, SymbolKind};
 use regex::Regex;
 use std::fs::File;
@@ -41,7 +41,8 @@ fn create_filtered_merged_macho_object(
 pub fn create_symbol_filter_list(
     object_dir: &Path,
     objects: impl IntoIterator<Item = impl AsRef<Path>>,
-    keep_regexes: &[Regex],
+    keep_or_remove: ArmergeKeepOrRemove,
+    regexes: &[Regex],
 ) -> Result<PathBuf, MergeError> {
     let filter_path = object_dir.join("localize.syms");
     let mut filter_syms = HashSet::new();
@@ -55,23 +56,32 @@ pub fn create_symbol_filter_list(
             inner: e,
         })?;
         'next_symbol: for sym in file.symbols() {
-            if !sym.is_global()
-                || sym.is_undefined()
-                || (sym.kind() != SymbolKind::Text
-                    && sym.kind() != SymbolKind::Data
-                    && sym.kind() != SymbolKind::Unknown/* ASM functions often end up unknown */)
+            if keep_or_remove == ArmergeKeepOrRemove::KeepSymbols
+                && (!sym.is_global()
+                    || sym.is_undefined()
+                    || (sym.kind() != SymbolKind::Text
+                        && sym.kind() != SymbolKind::Data
+                        && sym.kind() != SymbolKind::Unknown/* ASM functions often end up unknown */))
             {
                 continue;
             }
             if let Ok(name) = sym.name() {
-                for regex in keep_regexes {
+                for regex in regexes {
                     if regex.is_match(name) {
-                        kept_count += 1;
+                        if keep_or_remove == ArmergeKeepOrRemove::KeepSymbols {
+                            kept_count += 1;
+                        } else {
+                            filter_syms.insert(name.to_owned());
+                        }
                         continue 'next_symbol;
                     }
                 }
 
-                filter_syms.insert(name.to_owned());
+                if keep_or_remove == ArmergeKeepOrRemove::KeepSymbols {
+                    filter_syms.insert(name.to_owned());
+                } else {
+                    kept_count += 1;
+                }
             }
         }
     }
@@ -135,9 +145,10 @@ pub fn merge_required_macho_objects(
     obj_dir: &Path,
     merged_path: &Path,
     objects: &HashMap<PathBuf, ObjectSyms>,
-    keep_regexes: &[Regex],
+    keep_or_remove: ArmergeKeepOrRemove,
+    regexes: &[Regex],
 ) -> Result<(), MergeError> {
-    let filter_path = create_symbol_filter_list(obj_dir, objects.keys(), keep_regexes)?;
+    let filter_path = create_symbol_filter_list(obj_dir, objects.keys(), keep_or_remove, regexes)?;
     create_filtered_merged_macho_object(merged_path, objects.keys(), &filter_path)
 }
 
@@ -145,15 +156,16 @@ pub fn merge_required_objects(
     obj_dir: &Path,
     merged_path: &Path,
     objects: &HashMap<PathBuf, ObjectSyms>,
-    keep_regexes: &[Regex],
+    keep_or_remove: ArmergeKeepOrRemove,
+    regexes: &[Regex],
 ) -> Result<(), MergeError> {
-    let filter_path = create_symbol_filter_list(obj_dir, objects.keys(), keep_regexes)?;
+    let filter_path = create_symbol_filter_list(obj_dir, objects.keys(), keep_or_remove, regexes)?;
     create_filtered_merged_object(merged_path, objects.keys(), &filter_path)?;
 
     // If a symbol we localize is in a COMDAT section group, we also want to turn it into a regular
     // section group. Otherwise the local symbol is not really local, because the containing section
     // could later get COMDAT-folded with other (potentially incompatible) object files.
-    demote_elf_comdats(merged_path, keep_regexes)
+    demote_elf_comdats(merged_path, regexes)
 }
 
 fn demote_elf_comdats(merged_path: &Path, keep_regexes: &[Regex]) -> Result<(), MergeError> {
