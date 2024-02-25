@@ -73,8 +73,8 @@ pub fn create_merged_object(
             reason: "Failed to merged object files".to_string(),
             tool: ld_path.to_string_lossy().to_string(),
             args,
-            stdout: output.stdout,
-            stderr: output.stderr,
+            stdout: String::from_utf8_lossy(&output.stdout).to_string(),
+            stderr: String::from_utf8_lossy(&output.stderr).to_string(),
         })
     }
 }

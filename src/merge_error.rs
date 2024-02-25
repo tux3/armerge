@@ -7,16 +7,14 @@ use thiserror::Error;
 #[derive(Debug, Error)]
 pub enum MergeError {
     #[error(
-        "{reason}: {tool:?} {args:?})\nstdout: {}\nstderr: {}",
-        String::from_utf8_lossy(stdout),
-        String::from_utf8_lossy(stderr)
+        "{reason}: {tool:?} {args:?})\nstdout: {stdout}\nstderr: {stderr}"
     )]
     ExternalToolError {
         reason: String,
         tool: String,
         args: Vec<OsString>,
-        stdout: Vec<u8>,
-        stderr: Vec<u8>,
+        stdout: String,
+        stderr: String,
     },
     #[error("failed to launch external tool `{tool}`: {inner})")]
     ExternalToolLaunchError { tool: String, inner: io::Error },

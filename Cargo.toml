@@ -1,6 +1,6 @@
 [package]
 name = "armerge"
-version = "1.5.1"
+version = "2.0.0"
 authors = ["tux3 <barrdetwix@gmail.com>"]
 edition = "2021"
 rust-version = "1.56"

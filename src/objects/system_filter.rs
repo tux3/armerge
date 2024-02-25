@@ -33,7 +33,7 @@ fn create_filtered_merged_macho_object(
     let extra_args = &["-unexported_symbols_list".as_ref(), filter_list.as_os_str()];
     let merged_firstpass_path = merged_path.parent().unwrap().join("merged_firstpass.o");
     create_merged_object(&merged_firstpass_path, extra_args, objects, false)?;
-    create_merged_object(merged_path, &[], &[&merged_firstpass_path], true)?;
+    create_merged_object(merged_path, &[], [&merged_firstpass_path], true)?;
 
     Ok(())
 }
@@ -135,8 +135,8 @@ fn filter_symbols(object_path: &Path, filter_list_path: &Path) -> Result<(), Mer
             reason: "Failed to filter symbols".to_string(),
             tool: objcopy_path.to_string_lossy().to_string(),
             args,
-            stdout: output.stdout,
-            stderr: output.stderr,
+            stdout: String::from_utf8_lossy(&output.stdout).to_string(),
+            stderr: String::from_utf8_lossy(&output.stderr).to_string(),
         })
     }
 }

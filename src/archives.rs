@@ -165,8 +165,8 @@ pub fn create_index(archive_path: &std::path::Path) -> Result<(), MergeError> {
             reason: "Failed to create archive index with `ranlib`".to_string(),
             tool: "ranlib".to_string(),
             args: archive_path.iter().map(|p| p.to_owned()).collect(),
-            stdout: output.stdout,
-            stderr: output.stderr,
+            stdout: String::from_utf8_lossy(&output.stdout).to_string(),
+            stderr: String::from_utf8_lossy(&output.stderr).to_string(),
         })
     }
 }
