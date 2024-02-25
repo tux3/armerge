@@ -135,8 +135,8 @@ fn filter_symbols(object_path: &Path, filter_list_path: &Path) -> Result<(), Mer
             reason: "Failed to filter symbols".to_string(),
             tool: objcopy_path.to_string_lossy().to_string(),
             args,
-            stdout: output.stdout,
-            stderr: output.stderr,
+            stdout: String::from_utf8_lossy(&output.stdout).to_string(),
+            stderr: String::from_utf8_lossy(&output.stderr).to_string(),
         })
     }
 }

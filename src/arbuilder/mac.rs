@@ -77,8 +77,8 @@ impl MacArBuilder {
                 reason: "Failed to merge object files with `libtool`".to_string(),
                 tool: "libtool".to_string(),
                 args,
-                stdout: output.stdout,
-                stderr: output.stderr,
+                stdout: String::from_utf8_lossy(&output.stdout).to_string(),
+                stderr: String::from_utf8_lossy(&output.stderr).to_string(),
             })
         }
     }
