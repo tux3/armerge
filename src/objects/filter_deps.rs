@@ -2,7 +2,6 @@ use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
 use crate::{ArmergeKeepOrRemove, MergeError};
-use rayon::iter::IntoParallelIterator;
 use rayon::prelude::*;
 use regex::Regex;
 use tracing::{event_enabled, info, Level};

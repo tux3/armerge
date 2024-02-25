@@ -33,7 +33,7 @@ fn create_filtered_merged_macho_object(
     let extra_args = &["-unexported_symbols_list".as_ref(), filter_list.as_os_str()];
     let merged_firstpass_path = merged_path.parent().unwrap().join("merged_firstpass.o");
     create_merged_object(&merged_firstpass_path, extra_args, objects, false)?;
-    create_merged_object(merged_path, &[], &[&merged_firstpass_path], true)?;
+    create_merged_object(merged_path, &[], [&merged_firstpass_path], true)?;
 
     Ok(())
 }
