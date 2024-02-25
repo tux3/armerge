@@ -30,7 +30,13 @@ pub fn merge_required_objects(
     #[allow(clippy::if_same_then_else)] // Clippy can't see both [cfg] at once
     if contents_type == ArchiveContents::Elf {
         #[cfg(feature = "objpoke_symbols")]
-        builtin_filter::merge_required_objects(obj_dir, merged_path, objs, keep_or_remove, keeps)?;
+        builtin_filter::merge_required_objects(
+            obj_dir,
+            merged_path,
+            objs,
+            keep_or_remove,
+            regexes,
+        )?;
         #[cfg(not(feature = "objpoke_symbols"))]
         system_filter::merge_required_objects(obj_dir, merged_path, objs, keep_or_remove, regexes)?;
     } else if contents_type == ArchiveContents::MachO {
