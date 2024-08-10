@@ -8,7 +8,6 @@ use std::path::{Path, PathBuf};
 pub struct ObjectSyms {
     globals: HashSet<String>,
     undefineds: HashSet<String>,
-    pub kept_syms_list: String,
     pub has_exported_symbols: bool,
     pub deps: HashSet<PathBuf>,
 }
@@ -21,7 +20,6 @@ impl ObjectSyms {
     ) -> Result<Self, MergeError> {
         let mut globals = HashSet::new();
         let mut undefineds = HashSet::new();
-        let mut kept_syms_list = String::new();
         let mut has_exported_symbols = false;
 
         let data = std::fs::read(object_path)?;
@@ -58,8 +56,6 @@ impl ObjectSyms {
                     };
                     if keep_sym_condition {
                         has_exported_symbols = true;
-                        kept_syms_list += name;
-                        kept_syms_list.push('\n');
                         break;
                     }
                 }
@@ -70,7 +66,6 @@ impl ObjectSyms {
             globals,
             undefineds,
             has_exported_symbols,
-            kept_syms_list,
             deps: Default::default(),
         })
     }
