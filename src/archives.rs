@@ -8,9 +8,11 @@ use goblin::{peek_bytes, Hint};
 use rand::distributions::{Alphanumeric, DistString};
 use rand::thread_rng;
 use rayon::prelude::*;
+use std::ffi::OsString;
 use std::fmt::{Debug, Formatter};
 use std::fs::File;
 use std::io::{Read, Write};
+use std::str::FromStr;
 use tracing::info;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -149,21 +151,31 @@ pub fn extract_objects<I: IntoParallelIterator<Item = InputLibrary<R>>, R: Read>
 pub fn create_index(archive_path: &std::path::Path) -> Result<(), MergeError> {
     use std::process::Command;
 
-    info!("ranlib {}", archive_path.to_string_lossy());
+    let ranlib_path = if let Some(var) = std::env::var_os("RANLIB") {
+        var
+    } else {
+        OsString::from_str("ranlib").unwrap()
+    };
 
-    let output = Command::new("ranlib")
+    info!(
+        "{} {}",
+        ranlib_path.to_string_lossy(),
+        archive_path.to_string_lossy()
+    );
+
+    let output = Command::new(&ranlib_path)
         .args(vec![archive_path])
         .output()
         .map_err(|e| ExternalToolLaunchError {
-            tool: "ranlib".to_string(),
+            tool: ranlib_path.to_string_lossy().to_string(),
             inner: e,
         })?;
     if output.status.success() {
         Ok(())
     } else {
         Err(MergeError::ExternalToolError {
-            reason: "Failed to create archive index with `ranlib`".to_string(),
-            tool: "ranlib".to_string(),
+            reason: "Failed to create archive index".to_string(),
+            tool: ranlib_path.to_string_lossy().to_string(),
             args: archive_path.iter().map(|p| p.to_owned()).collect(),
             stdout: String::from_utf8_lossy(&output.stdout).to_string(),
             stderr: String::from_utf8_lossy(&output.stderr).to_string(),

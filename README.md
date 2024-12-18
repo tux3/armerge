@@ -1,4 +1,3 @@
-
 # armerge
 
 [![crates.io](https://img.shields.io/crates/v/armerge.svg)](https://crates.io/crates/armerge)
@@ -7,7 +6,7 @@
 [![CI](https://github.com/tux3/armerge/workflows/CI/badge.svg)](https://github.com/tux3/armerge/actions?query=workflow%3ACI)
 
 You can use armerge to combine multiple static libraries into a single merged `ar` archive.  
-Optionally, armerge can take a list of symbols you want to keep exported, and localizes (hides) the rest.  
+Optionally, armerge can take a list of symbols you want to keep exported, and localizes (hides) the rest.
 
 This allows you to hide your private symbols and the symbols of your dependencies.  
 For example, if your static library `libfoo.a` uses OpenSSL's `libcrypto.a`, armerge can create a single
@@ -46,11 +45,13 @@ When localizing symbols (`-k` option), only archives containing ELF or Mach-O ob
 (and in this case the output archive will contain a single relocatable object `merged.o`).
 
 This tool requires `ranlib`, `ld`, and `llvm-objcopy` to handle Linux static libraries.   
-For macOS libraries, `libtool` and the Apple `ld` are used instead.  
-You can use armerge to handle Linux/Android archives on a macOS host if the right toolchain is installed.
+For macOS libraries, `libtool` and the Apple `ld` are used instead.
 
 You may specify a different linker using the `LD` environment variable, and linker flags with `ARMERGE_LDFLAGS`.  
-You may specify a different objcopy implementation with the `OBJCOPY` env var.
+You may specify a different objcopy implementation with the `OBJCOPY` env var, and a different ranlib with `RANLIB`.
+
+You can use armerge to handle Linux/Android archives on a macOS host if the right toolchain is installed.
+(i.e. you may need to set `LD`, `OBJCOPY`, and `RANLIB` to point to the Android NDK, or to some other toolchain).
 
 ## Principle of operation
 
@@ -70,7 +71,7 @@ For performance reasons, `ar` archive usually also have an index, so we take car
 
 When you create a dynamic library, you can choose which set of symbols you want to export and which you want to keep internal.  
 This allows keeping dependencies and implementation details private, and prevents hard to debug symbol clashes.  
-For example, a `libfoo.so` library could bundle a copy of OpenSSL without problem, but only as long as it doesn't export those symbols.      
+For example, a `libfoo.so` library could bundle a copy of OpenSSL without problem, but only as long as it doesn't export those symbols.
 Hiding symbols is especially important on Android (which helpfully loads its own version of some popular dynamic libraries, like OpenSSL),
 although clashes can happen on any platform.
 
@@ -82,8 +83,7 @@ because each object would now fiercely keep its own symbols private from other o
 
 The solution is to do the same thing that dynamic libraries do: have it consist of a single object file.
 So in addition to merging multiple archive files into a single one, when you ask armerge to localize symbols it will
-pass all the object files in input libraries to the linker and create a single pre-linked object file,
-called a relocatable object.  
+pass all the object files in input libraries to the linker and create a single pre-linked object file, called a relocatable object.
 
 This results in a static library (for instance `libfoo.a`) that contains a single `merged.o` object.  
 Since all the input objects have already been pre-linked together, now there is a single symbol list for the whole library
@@ -95,6 +95,6 @@ The features required to control symbol export in static libraries is actually t
 
 But because linkers traditionally output static libraries containing multiple objects instead of a single pre-linked object,
 they've created an historical asymmetry where hiding symbols in dynamic libraries has always been easy,
-while hiding symbols in static libraries has never been supported by the toolchain.  
+while hiding symbols in static libraries has never been supported by the toolchain.
 
 So, armerge first corrects the asymmetry by asking the linker to pre-link the objects, and only then asks it to hide symbols. 
