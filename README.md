@@ -31,8 +31,9 @@ FLAGS:
     -v, --verbose    Print verbose information
 
 OPTIONS:
-    -k, --keep-symbols <keep-symbols>...    Accepts regexes of the symbol names to keep global, and localizes the rest
-    -o, --output <output>                   Output static library
+    -k, --keep-symbols <keep-symbols>...     Accepts regexes of the symbol names to keep global, and localizes the rest
+    -r, --remove-symbols <remove-symbols>... Accepts regexes of the symbol names to hide, and keep the rest global
+    -o, --output <output>                    Output static library
 
 ARGS:
     <INPUTS>...    Static libraries to merge
