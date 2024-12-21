@@ -1,7 +1,9 @@
 use armerge::{ArmergeKeepOrRemove, ArMerger};
 use regex::Regex;
 use std::error::Error;
-use std::path::PathBuf;
+use std::fs::File;
+use std::io::{BufRead, BufReader};
+use std::path::{Path, PathBuf};
 use structopt::StructOpt;
 use tracing::{error, Level};
 use tracing_subscriber::filter::Directive;
@@ -17,6 +19,10 @@ struct Opt {
     /// Accepts regexes of the symbol names to hide, and keep the rest global
     #[structopt(short, long, number_of_values = 1)]
     remove_symbols: Vec<String>,
+
+    /// Order file to control the sorting of merged objects
+    #[structopt(long, parse(from_os_str))]
+    order_file: Option<PathBuf>,
 
     /// Output static library
     #[structopt(short, long, parse(from_os_str))]
@@ -62,6 +68,11 @@ fn err_main(opt: Opt) -> Result<(), Box<dyn Error>> {
     }
 
     let merger = ArMerger::new_from_paths(&opt.inputs, &opt.output)?;
+    let object_order = if let Some(path) = &opt.order_file {
+        parse_order_file(path)
+    } else {
+        Vec::new()
+    };
 
     match (opt.keep_symbols.is_empty(), opt.remove_symbols.is_empty()) {
         (true, true) => {
@@ -75,7 +86,7 @@ fn err_main(opt: Opt) -> Result<(), Box<dyn Error>> {
                 .into_iter()
                 .map(|s| Regex::new(&s))
                 .collect::<Result<Vec<_>, _>>()?;
-            merger.merge_and_localize(ArmergeKeepOrRemove::KeepSymbols, keep_symbols)?;
+            merger.merge_and_localize_ordered(ArmergeKeepOrRemove::KeepSymbols, keep_symbols, object_order)?;
         },
         (true, false) => {
             let remove_symbols: Vec<Regex> = opt
@@ -83,7 +94,7 @@ fn err_main(opt: Opt) -> Result<(), Box<dyn Error>> {
                 .into_iter()
                 .map(|s| Regex::new(&s))
                 .collect::<Result<Vec<_>, _>>()?;
-            merger.merge_and_localize(ArmergeKeepOrRemove::RemoveSymbols, remove_symbols)?;
+            merger.merge_and_localize_ordered(ArmergeKeepOrRemove::RemoveSymbols, remove_symbols, object_order)?;
         },
         (false, false) => {
             return Err("Can't have both keep-symbols and remove-symbols options at the same time".to_string().into());
@@ -91,4 +102,12 @@ fn err_main(opt: Opt) -> Result<(), Box<dyn Error>> {
     }
 
     Ok(())
+}
+
+fn parse_order_file(path: &Path) -> Vec<String> {
+    BufReader::new(File::open(path).unwrap())
+        .lines()
+        .map(|line| line.unwrap().trim().to_string())
+        .filter(|line| !line.is_empty() && !line.starts_with('#'))
+        .collect()
 }
