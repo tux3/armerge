@@ -6,6 +6,7 @@ use rayon::prelude::*;
 use regex::Regex;
 use tracing::{event_enabled, info, Level};
 
+use crate::archives::get_object_name_from_path;
 use crate::objects::syms::ObjectSyms;
 
 fn add_deps_recursive(
@@ -40,11 +41,9 @@ pub fn filter_required_objects(
     for (obj_path, obj) in object_syms.iter() {
         if obj.has_exported_symbols {
             if event_enabled!(Level::INFO) {
-                let filename = obj_path.file_name().unwrap().to_string_lossy();
-                let name_parts = filename.rsplitn(3, '.').collect::<Vec<_>>();
                 info!(
                     "Will merge {:?} and its dependencies, as it contains global kept symbols",
-                    name_parts[2],
+                    get_object_name_from_path(obj_path),
                 );
             }
             required_objs.insert(obj_path.clone());
@@ -55,11 +54,9 @@ pub fn filter_required_objects(
     if event_enabled!(Level::INFO) {
         for obj in object_syms.keys() {
             if !required_objs.contains(obj) {
-                let filename = obj.file_name().unwrap().to_string_lossy();
-                let name_parts = filename.rsplitn(3, '.').collect::<Vec<_>>();
                 info!(
                     "`{}` is not used by any kept objects, it will be skipped",
-                    name_parts[2]
+                    get_object_name_from_path(obj)
                 )
             }
         }

@@ -104,12 +104,25 @@ impl ArMerger {
         keep_or_remove: ArmergeKeepOrRemove,
         symbols_regexes: Iter,
     ) -> Result<(), MergeError> {
+        self.merge_and_localize_ordered(keep_or_remove, symbols_regexes, std::iter::empty())
+    }
+
+    /// Merge input libraries in a specified order and localize non-public symbols
+    /// `keep_symbols_regexes` contains the regex name pattern for public symbols to keep exported
+    /// `object_order` contains the order in which certain object files will be merged
+    pub fn merge_and_localize_ordered<Iter: IntoIterator<Item = Regex>>(
+        self,
+        keep_or_remove: ArmergeKeepOrRemove,
+        symbols_regexes: Iter,
+        object_order: impl IntoIterator<Item = String>
+    ) -> Result<(), MergeError> {
         objects::merge(
             self.builder,
             self.extracted.contents_type,
             self.extracted.object_dir,
             keep_or_remove,
             symbols_regexes.into_iter().collect(),
+            object_order.into_iter().enumerate().map(|(i, s)| (s, i)).collect()
         )
     }
 }
