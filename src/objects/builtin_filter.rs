@@ -1,10 +1,8 @@
 use crate::{ArmergeKeepOrRemove, MergeError};
 use regex::Regex;
-use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use crate::objects::merge;
-use crate::objects::syms::ObjectSyms;
 
 pub fn merge_required_objects(
     _obj_dir: &Path,
