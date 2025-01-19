@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashSet};
 use std::path::PathBuf;
 
 use crate::{ArmergeKeepOrRemove, MergeError};
@@ -11,7 +11,7 @@ use crate::objects::syms::ObjectSyms;
 
 fn add_deps_recursive(
     objs_set: &mut HashSet<PathBuf>,
-    syms: &HashMap<PathBuf, ObjectSyms>,
+    syms: &BTreeMap<PathBuf, ObjectSyms>,
     obj: &ObjectSyms,
 ) {
     for dep in &obj.deps {
@@ -25,7 +25,7 @@ pub fn filter_required_objects(
     objects: &[PathBuf],
     keep_or_remove: ArmergeKeepOrRemove,
     regexes: &[Regex],
-) -> Result<HashMap<PathBuf, ObjectSyms>, MergeError> {
+) -> Result<BTreeMap<PathBuf, ObjectSyms>, MergeError> {
     let mut object_syms = objects
         .into_par_iter()
         .map(|obj_path| {
@@ -34,7 +34,7 @@ pub fn filter_required_objects(
                 ObjectSyms::new(obj_path, keep_or_remove, regexes)?,
             ))
         })
-        .collect::<Result<HashMap<PathBuf, ObjectSyms>, _>>()?;
+        .collect::<Result<BTreeMap<PathBuf, ObjectSyms>, _>>()?;
     ObjectSyms::check_dependencies(&mut object_syms);
 
     let mut required_objs = HashSet::new();

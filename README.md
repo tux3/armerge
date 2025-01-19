@@ -57,11 +57,11 @@ You can use armerge to handle Linux/Android archives on a macOS host if the righ
 
 ## Object merge order
 
-By default, objects are passed to the linker in an unspecified order. Linkers typically lay out the output file's sections in the order the inputs are specified.
+By default, objects are passed to the linker in alphabetical order. Linkers typically lay out the output file's sections in the order the inputs are specified. Passing the objects in alphabetical order helps make the output deterministic.
 
 If you want to control the order in which some of the object files are merged, you can use the `--order-file` option. With this option, you can specify an order file that controls the relative order in which armerge passes the listed object files to the linker, so you can precisely control the order in which certain sections will be laid out in the output.
 
-The order file is a plain text file with one entry per line, in the format `{INPUT_LIB}@{OBJNAME}`, where `INPUT_LIB` is the name of the input library and `OBJNAME` is the name of the object file to select from that library. Blank lines or lines starting with the `#` sign are ignored. Any object files not listed are placed after all of the listed objects in an unspecified order. For example:
+The order file is a plain text file with one entry per line, in the format `{INPUT_LIB}@{OBJNAME}`, where `INPUT_LIB` is the name of the input library and `OBJNAME` is the name of the object file to select from that library. Blank lines or lines starting with the `#` sign are ignored. Any object files not listed are placed after all of the listed objects, in alphabetical order. For example:
 
 ```
 # Place the custom malloc object file first
@@ -70,7 +70,7 @@ libmyallocator.a@mymalloc.o
 # Place the app's entry point next
 libmyapp.a@entry.o
 
-# All other object files are placed after this in an unspecified order.
+# All other object files are placed after this in alphabetical order.
 ```
 
 ## Principle of operation
