@@ -7,7 +7,7 @@ mod builtin_filter;
 mod system_filter;
 
 use crate::arbuilder::ArBuilder;
-use crate::objects::syms::ObjectSyms;
+use crate::archives::get_object_name_from_path;
 use crate::{ArchiveContents, ArmergeKeepOrRemove, MergeError};
 use regex::Regex;
 use std::collections::HashMap;
@@ -23,7 +23,7 @@ pub fn merge_required_objects(
     contents_type: ArchiveContents,
     obj_dir: &Path,
     merged_path: &Path,
-    objs: &HashMap<PathBuf, ObjectSyms>,
+    objs: &[PathBuf],
     keep_or_remove: ArmergeKeepOrRemove,
     regexes: &[Regex],
 ) -> Result<(), MergeError> {
@@ -59,6 +59,7 @@ pub fn merge(
     objects: ObjectTempDir,
     keep_or_remove: ArmergeKeepOrRemove,
     mut regexes: Vec<Regex>,
+    object_order: HashMap<String, usize>,
 ) -> Result<(), MergeError> {
     let merged_name = "merged.o";
     let mut merged_path = objects.dir.path().to_owned();
@@ -77,6 +78,15 @@ pub fn merge(
         return Err(MergeError::NoObjectsLeft);
     }
 
+    let mut sorted_objects = required_objects.into_keys().collect::<Vec<_>>();
+    sorted_objects.sort_by(|a, b| {
+        let name1 = get_object_name_from_path(a);
+        let name2 = get_object_name_from_path(b);
+        let i1 = object_order.get(&name1).unwrap_or(&usize::MAX);
+        let i2 = object_order.get(&name2).unwrap_or(&usize::MAX);
+        i1.cmp(i2)
+    });
+
     if keep_or_remove == ArmergeKeepOrRemove::KeepSymbols {
         // When filtering symbols to keep just the public API visible,
         // we must make an exception for the unwind symbols (if linked statically)
@@ -88,7 +98,7 @@ pub fn merge(
         contents_type,
         objects.dir.path(),
         &merged_path,
-        &required_objects,
+        &sorted_objects,
         keep_or_remove,
         &regexes,
     )?;

@@ -148,6 +148,12 @@ pub fn extract_objects<I: IntoParallelIterator<Item = InputLibrary<R>>, R: Read>
     })
 }
 
+pub fn get_object_name_from_path(path: &std::path::Path) -> String {
+    let filename = path.file_name().unwrap().to_string_lossy();
+    let name_parts = filename.rsplitn(3, '.').collect::<Vec<_>>();
+    name_parts[2].to_string()
+}
+
 pub fn create_index(archive_path: &std::path::Path) -> Result<(), MergeError> {
     use std::process::Command;
 

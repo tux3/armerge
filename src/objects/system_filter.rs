@@ -1,5 +1,5 @@
 use goblin::{peek_bytes, Hint};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::ffi::OsString;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
@@ -7,7 +7,6 @@ use std::process::Command;
 use std::str::FromStr;
 
 use crate::objects::merge::create_merged_object;
-use crate::objects::syms::ObjectSyms;
 use crate::{ArmergeKeepOrRemove, MergeError};
 use object::{Object, ObjectSymbol, SymbolKind};
 use regex::Regex;
@@ -144,23 +143,23 @@ fn filter_symbols(object_path: &Path, filter_list_path: &Path) -> Result<(), Mer
 pub fn merge_required_macho_objects(
     obj_dir: &Path,
     merged_path: &Path,
-    objects: &HashMap<PathBuf, ObjectSyms>,
+    objects: &[PathBuf],
     keep_or_remove: ArmergeKeepOrRemove,
     regexes: &[Regex],
 ) -> Result<(), MergeError> {
-    let filter_path = create_symbol_filter_list(obj_dir, objects.keys(), keep_or_remove, regexes)?;
-    create_filtered_merged_macho_object(merged_path, objects.keys(), &filter_path)
+    let filter_path = create_symbol_filter_list(obj_dir, objects, keep_or_remove, regexes)?;
+    create_filtered_merged_macho_object(merged_path, objects, &filter_path)
 }
 
 pub fn merge_required_objects(
     obj_dir: &Path,
     merged_path: &Path,
-    objects: &HashMap<PathBuf, ObjectSyms>,
+    objects: &[PathBuf],
     keep_or_remove: ArmergeKeepOrRemove,
     regexes: &[Regex],
 ) -> Result<(), MergeError> {
-    let filter_path = create_symbol_filter_list(obj_dir, objects.keys(), keep_or_remove, regexes)?;
-    create_filtered_merged_object(merged_path, objects.keys(), &filter_path)?;
+    let filter_path = create_symbol_filter_list(obj_dir, objects, keep_or_remove, regexes)?;
+    create_filtered_merged_object(merged_path, objects, &filter_path)?;
 
     // If a symbol we localize is in a COMDAT section group, we also want to turn it into a regular
     // section group. Otherwise the local symbol is not really local, because the containing section
