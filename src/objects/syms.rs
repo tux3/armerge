@@ -2,7 +2,7 @@ use crate::{ArmergeKeepOrRemove, MergeError};
 use object::{Object, ObjectSymbol, SymbolKind};
 use rayon::prelude::*;
 use regex::Regex;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashSet};
 use std::path::{Path, PathBuf};
 
 pub struct ObjectSyms {
@@ -79,7 +79,7 @@ impl ObjectSyms {
         false
     }
 
-    pub fn check_dependencies(object_syms: &mut HashMap<PathBuf, Self>) {
+    pub fn check_dependencies(object_syms: &mut BTreeMap<PathBuf, Self>) {
         let deps_map = object_syms
             .par_iter()
             .map(|(left_path, left_syms)| {
@@ -95,7 +95,7 @@ impl ObjectSyms {
                 }
                 (left_path.to_owned(), deps)
             })
-            .collect::<HashMap<_, _>>();
+            .collect::<BTreeMap<_, _>>();
         for (path, deps) in deps_map {
             object_syms.get_mut(&path).unwrap().deps = deps;
         }
