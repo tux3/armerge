@@ -12,7 +12,7 @@ description = "Tool to merge and control visibility of static libraries"
 
 [dependencies]
 objpoke = "0.3"
-structopt = "0.3"
+clap = { version = "4.5.30", features = ["derive"] }
 ar = "0.9"
 tempfile = "3.3.0"
 rand = "0.8"
