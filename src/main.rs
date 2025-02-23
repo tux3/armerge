@@ -4,36 +4,35 @@ use std::error::Error;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
-use structopt::StructOpt;
+use clap::Parser;
 use tracing::{error, Level};
 use tracing_subscriber::filter::Directive;
 use tracing_subscriber::fmt::time::UtcTime;
 
-#[derive(StructOpt, Debug)]
-#[structopt(name = "armerge")]
+#[derive(Parser, Debug)]
+#[command(version, about)]
 struct Opt {
     /// Accepts regexes of the symbol names to keep global, and localizes the rest
-    #[structopt(short, long, number_of_values = 1)]
+    #[arg(short, long, num_args = 1)]
     keep_symbols: Vec<String>,
 
     /// Accepts regexes of the symbol names to hide, and keep the rest global
-    #[structopt(short, long, number_of_values = 1)]
+    #[arg(short, long, num_args = 1)]
     remove_symbols: Vec<String>,
 
     /// Order file to control the sorting of merged objects
-    #[structopt(long, parse(from_os_str))]
+    #[arg(long)]
     order_file: Option<PathBuf>,
 
     /// Output static library
-    #[structopt(short, long, parse(from_os_str))]
+    #[arg(short, long)]
     output: PathBuf,
 
     /// Print verbose information
-    #[structopt(short, long)]
+    #[arg(short, long)]
     verbose: bool,
 
     /// Static libraries to merge
-    #[structopt(name = "INPUTS", parse(from_os_str))]
     inputs: Vec<PathBuf>,
 }
 
@@ -45,7 +44,7 @@ fn main() {
         std::env::set_var("RUST_LOG", "warn")
     }
 
-    let opt = Opt::from_args();
+    let opt = Opt::parse();
     let mut filter = tracing_subscriber::EnvFilter::from_default_env();
     if opt.verbose {
         filter = filter.add_directive(Directive::from(Level::INFO));
