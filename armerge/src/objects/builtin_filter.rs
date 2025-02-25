@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 
 use crate::objects::merge;
 
+#[cfg(feature = "objpoke_symbols")]
 pub fn merge_required_objects(
     _obj_dir: &Path,
     merged_path: &Path,
@@ -20,14 +21,14 @@ pub fn merge_required_objects(
 
     // Filtering the symbols is faster in pure Rust, compared to calling the system's objcopy
     let merged_elf = std::fs::read(merged_path)?;
-    let filtered_elf = objpoke::elf::localize_elf_symbols(merged_elf, regexes)
-        .map_err(|e| MergeError::InternalError(e.into()))?;
+    let filtered_elf =
+        objpoke::elf::localize_elf_symbols(merged_elf, regexes).map_err(|e| MergeError::InternalError(e.into()))?;
 
     // If a symbol we localize is in a COMDAT section group, we also want to turn it into a regular
     // section group. Otherwise the local symbol is not really local, because the containing section
     // could later get COMDAT-folded with other (potentially incompatible) object files.
-    let filtered_elf = objpoke::elf::demote_comdat_groups(filtered_elf, regexes)
-        .map_err(|e| MergeError::InternalError(e.into()))?;
+    let filtered_elf =
+        objpoke::elf::demote_comdat_groups(filtered_elf, regexes).map_err(|e| MergeError::InternalError(e.into()))?;
 
     std::fs::write(merged_path, filtered_elf)?;
     Ok(())

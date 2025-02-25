@@ -1,19 +1,18 @@
-use crate::arbuilder::ArBuilder;
-use crate::input_library::InputLibrary;
-use crate::objects::ObjectTempDir;
-use crate::MergeError::ExternalToolLaunchError;
-use crate::{MergeError, ProcessInputError};
+use crate::{
+    arbuilder::ArBuilder, input_library::InputLibrary, objects::ObjectTempDir, MergeError,
+    MergeError::ExternalToolLaunchError, ProcessInputError,
+};
 use ar::Archive;
 use goblin::{peek_bytes, Hint};
-use rand::distributions::{Alphanumeric, DistString};
-use rand::thread_rng;
+use rand::distr::{Alphanumeric, SampleString};
 use rayon::prelude::*;
-use std::ffi::OsString;
-use std::fmt::{Debug, Formatter};
-use std::fs::File;
-use std::io::{Read, Write};
-use std::str::FromStr;
-use tracing::info;
+use std::{
+    ffi::OsString,
+    fmt::{Debug, Formatter},
+    fs::File,
+    io::{Read, Write},
+    str::FromStr,
+};
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum ArchiveContents {
@@ -85,13 +84,10 @@ pub fn extract_objects<I: IntoParallelIterator<Item = InputLibrary<R>>, R: Read>
             |(mut objects, mut archive_contents), input_lib| {
                 let mut archive = Archive::new(input_lib.reader);
                 while let Some(entry_result) = archive.next_entry() {
-                    let mut entry =
-                        entry_result.map_err(|e| ProcessInputError::ReadingArchive {
-                            name: input_lib.name.clone(),
-                            inner: e,
-                        })?;
+                    let mut entry = entry_result
+                        .map_err(|e| ProcessInputError::ReadingArchive { name: input_lib.name.clone(), inner: e })?;
 
-                    let rnd: String = Alphanumeric.sample_string(&mut thread_rng(), 8);
+                    let rnd: String = Alphanumeric.sample_string(&mut rand::rng(), 8);
                     let mut obj_path = dir.path().to_owned();
                     obj_path.push(format!(
                         "{}@{}.{}.o",
@@ -101,33 +97,18 @@ pub fn extract_objects<I: IntoParallelIterator<Item = InputLibrary<R>>, R: Read>
                     ));
 
                     let hint_bytes = &mut [0u8; 16];
-                    entry.read_exact(hint_bytes).map_err(|e| {
-                        ProcessInputError::ReadingArchive {
-                            name: input_lib.name.clone(),
-                            inner: e,
-                        }
-                    })?;
+                    entry
+                        .read_exact(hint_bytes)
+                        .map_err(|e| ProcessInputError::ReadingArchive { name: input_lib.name.clone(), inner: e })?;
                     let obj_type = archive_object_type(hint_bytes);
                     archive_contents = ArchiveContents::merge(archive_contents, obj_type);
 
-                    let mut file = File::create(&obj_path).map_err(|e| {
-                        ProcessInputError::ExtractingObject {
-                            path: obj_path.to_owned(),
-                            inner: e,
-                        }
-                    })?;
-                    file.write_all(hint_bytes).map_err(|e| {
-                        ProcessInputError::ExtractingObject {
-                            path: obj_path.to_owned(),
-                            inner: e,
-                        }
-                    })?;
-                    std::io::copy(&mut entry, &mut file).map_err(|e| {
-                        ProcessInputError::ExtractingObject {
-                            path: obj_path.to_owned(),
-                            inner: e,
-                        }
-                    })?;
+                    let mut file = File::create(&obj_path)
+                        .map_err(|e| ProcessInputError::ExtractingObject { path: obj_path.to_owned(), inner: e })?;
+                    file.write_all(hint_bytes)
+                        .map_err(|e| ProcessInputError::ExtractingObject { path: obj_path.to_owned(), inner: e })?;
+                    std::io::copy(&mut entry, &mut file)
+                        .map_err(|e| ProcessInputError::ExtractingObject { path: obj_path.to_owned(), inner: e })?;
                     objects.push(obj_path);
                 }
 
@@ -163,19 +144,12 @@ pub fn create_index(archive_path: &std::path::Path) -> Result<(), MergeError> {
         OsString::from_str("ranlib").unwrap()
     };
 
-    info!(
-        "{} {}",
-        ranlib_path.to_string_lossy(),
-        archive_path.to_string_lossy()
-    );
+    tracing::info!("{} {}", ranlib_path.to_string_lossy(), archive_path.to_string_lossy());
 
     let output = Command::new(&ranlib_path)
         .args(vec![archive_path])
         .output()
-        .map_err(|e| ExternalToolLaunchError {
-            tool: ranlib_path.to_string_lossy().to_string(),
-            inner: e,
-        })?;
+        .map_err(|e| ExternalToolLaunchError { tool: ranlib_path.to_string_lossy().to_string(), inner: e })?;
     if output.status.success() {
         Ok(())
     } else {

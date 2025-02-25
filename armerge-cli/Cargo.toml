@@ -1,0 +1,25 @@
+[package]
+name = "armerge-cli"
+version = "2.2.0"
+authors = ["tux3 <barrdetwix@gmail.com>"]
+edition = "2021"
+rust-version = "1.74"
+license = "MIT OR Apache-2.0"
+readme = "../README.md"
+repository = "https://github.com/tux3/armerge/"
+categories = ["command-line-utilities", "development-tools::build-utils"]
+description = "Tool to merge and control visibility of static libraries"
+
+[[bin]]
+name = "armerge"
+path = "src/main.rs"
+
+[dependencies]
+armerge = { path = "../armerge" }
+
+tracing = { workspace = true }
+regex = { workspace = true }
+
+clap = { version = "4.5.31", features = ["derive"] }
+tracing-subscriber = { version = "0.3.19", features = ["env-filter", "time"] }
+time = { version = "0.3.39", features = ["formatting"] }

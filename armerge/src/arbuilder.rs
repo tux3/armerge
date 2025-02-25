@@ -1,6 +1,5 @@
 use crate::MergeError;
-use std::fmt::Debug;
-use std::path::Path;
+use std::{fmt::Debug, path::Path};
 
 pub mod common;
 pub mod mac;

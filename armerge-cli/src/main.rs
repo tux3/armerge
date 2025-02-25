@@ -1,13 +1,14 @@
-use armerge::{ArmergeKeepOrRemove, ArMerger};
-use regex::Regex;
-use std::error::Error;
-use std::fs::File;
-use std::io::{BufRead, BufReader};
-use std::path::{Path, PathBuf};
+use armerge::{ArMerger, ArmergeKeepOrRemove};
 use clap::Parser;
+use regex::Regex;
+use std::{
+    error::Error,
+    fs::File,
+    io::{BufRead, BufReader},
+    path::{Path, PathBuf},
+};
 use tracing::{error, Level};
-use tracing_subscriber::filter::Directive;
-use tracing_subscriber::fmt::time::UtcTime;
+use tracing_subscriber::{filter::Directive, fmt::time::UtcTime};
 
 #[derive(Parser, Debug)]
 #[command(version, about)]
@@ -37,20 +38,13 @@ struct Opt {
 }
 
 fn main() {
-    if std::env::var("RUST_LIB_BACKTRACE").is_err() {
-        std::env::set_var("RUST_LIB_BACKTRACE", "1")
-    }
-    if std::env::var("RUST_LOG").is_err() {
-        std::env::set_var("RUST_LOG", "warn")
-    }
-
     let opt = Opt::parse();
-    let mut filter = tracing_subscriber::EnvFilter::from_default_env();
-    if opt.verbose {
-        filter = filter.add_directive(Directive::from(Level::INFO));
-    }
+    let filter = tracing_subscriber::EnvFilter::builder()
+        .with_default_directive(Directive::from(if opt.verbose { Level::INFO } else { Level::WARN }))
+        .from_env_lossy();
+
     let time_format = time::format_description::parse("[hour]:[minute]:[second]").unwrap();
-    tracing_subscriber::fmt::fmt()
+    tracing_subscriber::fmt()
         .with_timer(UtcTime::new(time_format))
         .with_env_filter(filter)
         .init();
@@ -96,8 +90,12 @@ fn err_main(opt: Opt) -> Result<(), Box<dyn Error>> {
             merger.merge_and_localize_ordered(ArmergeKeepOrRemove::RemoveSymbols, remove_symbols, object_order)?;
         },
         (false, false) => {
-            return Err("Can't have both keep-symbols and remove-symbols options at the same time".to_string().into());
-        }
+            return Err(
+                "Can't have both keep-symbols and remove-symbols options at the same time"
+                    .to_string()
+                    .into(),
+            );
+        },
     }
 
     Ok(())

@@ -1,9 +1,9 @@
-use crate::arbuilder::ArBuilder;
-use crate::MergeError;
-use crate::MergeError::ExternalToolLaunchError;
-use std::ffi::OsString;
-use std::path::{Path, PathBuf};
-use std::process::Command;
+use crate::{arbuilder::ArBuilder, MergeError, MergeError::ExternalToolLaunchError};
+use std::{
+    ffi::OsString,
+    path::{Path, PathBuf},
+    process::Command,
+};
 use tracing::info;
 
 #[derive(Debug)]
@@ -26,11 +26,7 @@ impl ArBuilder for MacArBuilder {
 
 impl MacArBuilder {
     pub fn new(path: &Path) -> Self {
-        Self {
-            output_path: path.to_owned(),
-            obj_paths: vec![],
-            closed: false,
-        }
+        Self { output_path: path.to_owned(), obj_paths: vec![], closed: false }
     }
 
     fn write_obj(&mut self) -> Result<(), MergeError> {
@@ -56,20 +52,13 @@ impl MacArBuilder {
         info!(
             "Merging {} objects: libtool {}",
             count,
-            args.iter()
-                .map(|s| s.to_string_lossy())
-                .collect::<Vec<_>>()
-                .join(" ")
+            args.iter().map(|s| s.to_string_lossy()).collect::<Vec<_>>().join(" ")
         );
 
-        let output =
-            Command::new("libtool")
-                .args(&args)
-                .output()
-                .map_err(|e| ExternalToolLaunchError {
-                    tool: "libtool".to_string(),
-                    inner: e,
-                })?;
+        let output = Command::new("libtool")
+            .args(&args)
+            .output()
+            .map_err(|e| ExternalToolLaunchError { tool: "libtool".to_string(), inner: e })?;
         if output.status.success() {
             Ok(())
         } else {

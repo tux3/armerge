@@ -2,8 +2,10 @@ use crate::{ArmergeKeepOrRemove, MergeError};
 use object::{Object, ObjectSymbol, SymbolKind};
 use rayon::prelude::*;
 use regex::Regex;
-use std::collections::{BTreeMap, HashSet};
-use std::path::{Path, PathBuf};
+use std::{
+    collections::{BTreeMap, HashSet},
+    path::{Path, PathBuf},
+};
 
 pub struct ObjectSyms {
     globals: HashSet<String>,
@@ -13,25 +15,16 @@ pub struct ObjectSyms {
 }
 
 impl ObjectSyms {
-    pub fn new(
-        object_path: &Path,
-        keep_or_remove: ArmergeKeepOrRemove,
-        regexes: &[Regex],
-    ) -> Result<Self, MergeError> {
+    pub fn new(object_path: &Path, keep_or_remove: ArmergeKeepOrRemove, regexes: &[Regex]) -> Result<Self, MergeError> {
         let mut globals = HashSet::new();
         let mut undefineds = HashSet::new();
         let mut has_exported_symbols = false;
 
         let data = std::fs::read(object_path)?;
-        let file = object::File::parse(data.as_slice()).map_err(|e| MergeError::InvalidObject {
-            path: object_path.to_owned(),
-            inner: e,
-        })?;
+        let file = object::File::parse(data.as_slice())
+            .map_err(|e| MergeError::InvalidObject { path: object_path.to_owned(), inner: e })?;
         for sym in file.symbols() {
-            if sym.kind() != SymbolKind::Text
-                && sym.kind() != SymbolKind::Data
-                && sym.kind() != SymbolKind::Unknown
-            {
+            if sym.kind() != SymbolKind::Text && sym.kind() != SymbolKind::Data && sym.kind() != SymbolKind::Unknown {
                 continue;
             }
 
@@ -62,12 +55,7 @@ impl ObjectSyms {
             }
         }
 
-        Ok(Self {
-            globals,
-            undefineds,
-            has_exported_symbols,
-            deps: Default::default(),
-        })
+        Ok(Self { globals, undefineds, has_exported_symbols, deps: Default::default() })
     }
 
     pub fn has_dependency(&self, obj_syms: &ObjectSyms) -> bool {
