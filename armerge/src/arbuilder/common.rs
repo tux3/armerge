@@ -1,9 +1,10 @@
-use crate::arbuilder::ArBuilder;
-use crate::{archives, MergeError};
+use crate::{arbuilder::ArBuilder, archives, MergeError};
 use ar::Builder;
-use std::fmt::{Debug, Formatter};
-use std::fs::File;
-use std::path::{Path, PathBuf};
+use std::{
+    fmt::{Debug, Formatter},
+    fs::File,
+    path::{Path, PathBuf},
+};
 
 pub struct CommonArBuilder {
     builder: Builder<File>,
@@ -22,9 +23,7 @@ impl Debug for CommonArBuilder {
 
 impl ArBuilder for CommonArBuilder {
     fn append_obj(&mut self, path: &Path) -> Result<(), MergeError> {
-        self.builder
-            .append_path(path)
-            .map_err(MergeError::WritingArchive)?;
+        self.builder.append_path(path).map_err(MergeError::WritingArchive)?;
         Ok(())
     }
 

@@ -1,14 +1,10 @@
-use std::ffi::OsString;
-use std::io;
-use std::path::PathBuf;
+use std::{ffi::OsString, io, path::PathBuf};
 use thiserror::Error;
 
 /// Errors that happen while creating the merged output static library from the extracted inputs
 #[derive(Debug, Error)]
 pub enum MergeError {
-    #[error(
-        "{reason}: {tool:?} {args:?})\nstdout: {stdout}\nstderr: {stderr}"
-    )]
+    #[error("{reason}: {tool:?} {args:?})\nstdout: {stdout}\nstderr: {stderr}")]
     ExternalToolError {
         reason: String,
         tool: String,

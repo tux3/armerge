@@ -1,8 +1,10 @@
 use crate::MergeError;
-use std::ffi::{OsStr, OsString};
-use std::path::Path;
-use std::process::Command;
-use std::str::FromStr;
+use std::{
+    ffi::{OsStr, OsString},
+    path::Path,
+    process::Command,
+    str::FromStr,
+};
 use tracing::{debug, info};
 
 pub fn create_merged_object(
@@ -39,11 +41,7 @@ pub fn create_merged_object(
             .map(|p| p.as_ref().as_os_str().into()),
     );
 
-    let trace_args = args
-        .iter()
-        .map(|s| s.to_string_lossy())
-        .collect::<Vec<_>>()
-        .join(" ");
+    let trace_args = args.iter().map(|s| s.to_string_lossy()).collect::<Vec<_>>().join(" ");
     if silent {
         debug!(
             "Merging {} objects: {} {}",
@@ -60,12 +58,10 @@ pub fn create_merged_object(
         );
     }
 
-    let output = Command::new(&ld_path).args(&args).output().map_err(|e| {
-        MergeError::ExternalToolLaunchError {
-            tool: ld_path.to_string_lossy().to_string(),
-            inner: e,
-        }
-    })?;
+    let output = Command::new(&ld_path)
+        .args(&args)
+        .output()
+        .map_err(|e| MergeError::ExternalToolLaunchError { tool: ld_path.to_string_lossy().to_string(), inner: e })?;
     if output.status.success() {
         Ok(())
     } else {

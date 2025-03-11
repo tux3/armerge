@@ -1,13 +1,14 @@
 use goblin::{peek_bytes, Hint};
-use std::collections::HashSet;
-use std::ffi::OsString;
-use std::io::{Read, Seek, SeekFrom, Write};
-use std::path::{Path, PathBuf};
-use std::process::Command;
-use std::str::FromStr;
+use std::{
+    collections::HashSet,
+    ffi::OsString,
+    io::{Read, Seek, SeekFrom, Write},
+    path::{Path, PathBuf},
+    process::Command,
+    str::FromStr,
+};
 
-use crate::objects::merge::create_merged_object;
-use crate::{ArmergeKeepOrRemove, MergeError};
+use crate::{objects::merge::create_merged_object, ArmergeKeepOrRemove, MergeError};
 use object::{Object, ObjectSymbol, SymbolKind};
 use regex::Regex;
 use std::fs::File;
@@ -50,10 +51,8 @@ pub fn create_symbol_filter_list(
     for object_path in objects.into_iter() {
         let object_path = object_path.as_ref();
         let data = std::fs::read(object_path)?;
-        let file = object::File::parse(data.as_slice()).map_err(|e| MergeError::InvalidObject {
-            path: object_path.to_owned(),
-            inner: e,
-        })?;
+        let file = object::File::parse(data.as_slice())
+            .map_err(|e| MergeError::InvalidObject { path: object_path.to_owned(), inner: e })?;
         'next_symbol: for sym in file.symbols() {
             if keep_or_remove == ArmergeKeepOrRemove::KeepSymbols
                 && (!sym.is_global()
@@ -114,10 +113,7 @@ fn filter_symbols(object_path: &Path, filter_list_path: &Path) -> Result<(), Mer
     info!(
         "{} {}",
         objcopy_path.to_string_lossy(),
-        args.iter()
-            .map(|s| s.to_string_lossy())
-            .collect::<Vec<_>>()
-            .join(" ")
+        args.iter().map(|s| s.to_string_lossy()).collect::<Vec<_>>().join(" ")
     );
 
     let output = Command::new(&objcopy_path)
@@ -185,7 +181,7 @@ fn demote_elf_comdats(merged_path: &Path, keep_regexes: &[Regex]) -> Result<(), 
                 file.read_to_end(&mut data)?;
                 objpoke::elf::demote_comdat_groups(data, keep_regexes)
                     .map_err(|e| MergeError::InternalError(e.into()))?
-            }
+            },
             // We don't know about needing to demote any COMDATs in PE/Mach-O files
             Ok(Hint::Mach(_) | Hint::MachFat(_)) => return Ok(()),
             Ok(Hint::PE) => return Ok(()),

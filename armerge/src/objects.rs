@@ -6,12 +6,14 @@ mod syms;
 mod builtin_filter;
 mod system_filter;
 
-use crate::arbuilder::ArBuilder;
-use crate::archives::get_object_name_from_path;
-use crate::{ArchiveContents, ArmergeKeepOrRemove, MergeError};
+use crate::{
+    arbuilder::ArBuilder, archives::get_object_name_from_path, ArchiveContents, ArmergeKeepOrRemove, MergeError,
+};
 use regex::Regex;
-use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
 use tempfile::TempDir;
 
 pub struct ObjectTempDir {
@@ -30,23 +32,11 @@ pub fn merge_required_objects(
     #[allow(clippy::if_same_then_else)] // Clippy can't see both [cfg] at once
     if contents_type == ArchiveContents::Elf {
         #[cfg(feature = "objpoke_symbols")]
-        builtin_filter::merge_required_objects(
-            obj_dir,
-            merged_path,
-            objs,
-            keep_or_remove,
-            regexes,
-        )?;
+        builtin_filter::merge_required_objects(obj_dir, merged_path, objs, keep_or_remove, regexes)?;
         #[cfg(not(feature = "objpoke_symbols"))]
         system_filter::merge_required_objects(obj_dir, merged_path, objs, keep_or_remove, regexes)?;
     } else if contents_type == ArchiveContents::MachO {
-        system_filter::merge_required_macho_objects(
-            obj_dir,
-            merged_path,
-            objs,
-            keep_or_remove,
-            regexes,
-        )?;
+        system_filter::merge_required_macho_objects(obj_dir, merged_path, objs, keep_or_remove, regexes)?;
     } else {
         system_filter::merge_required_objects(obj_dir, merged_path, objs, keep_or_remove, regexes)?;
     }
@@ -71,8 +61,7 @@ pub fn merge(
         regexes.push(Regex::new("^_?_Unwind_.*").expect("Failed to compile Regex"));
     }
 
-    let required_objects =
-        filter_deps::filter_required_objects(&objects.objects, keep_or_remove, &regexes)?;
+    let required_objects = filter_deps::filter_required_objects(&objects.objects, keep_or_remove, &regexes)?;
 
     if required_objects.is_empty() {
         return Err(MergeError::NoObjectsLeft);

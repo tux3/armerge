@@ -1,5 +1,4 @@
-use std::io;
-use std::path::PathBuf;
+use std::{io, path::PathBuf};
 use thiserror::Error;
 
 /// Errors that happen while processing inputs static libraries and extracting objects from them

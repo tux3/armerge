@@ -5,18 +5,16 @@ mod merge_error;
 mod objects;
 mod process_input_error;
 
-use crate::arbuilder::common::CommonArBuilder;
-use crate::arbuilder::mac::MacArBuilder;
-use crate::arbuilder::ArBuilder;
-use crate::archives::{ArchiveContents, ExtractedArchive};
 pub use crate::input_library::InputLibrary;
-use crate::merge_error::MergeError;
-use crate::process_input_error::ProcessInputError;
+use crate::{
+    arbuilder::{common::CommonArBuilder, mac::MacArBuilder, ArBuilder},
+    archives::{ArchiveContents, ExtractedArchive},
+    merge_error::MergeError,
+    process_input_error::ProcessInputError,
+};
 use rayon::prelude::*;
 use regex::Regex;
-use std::fs::File;
-use std::io::Read;
-use std::path::Path;
+use std::{fs::File, io::Read, path::Path};
 use tracing::error;
 
 #[derive(Debug)]
@@ -58,10 +56,7 @@ impl ArMerger {
                     .replace('/', "_");
                 match File::open(path) {
                     Ok(f) => Ok(InputLibrary::new(filename, f)),
-                    Err(e) => Err(ProcessInputError::FileOpen {
-                        path: path.to_owned(),
-                        inner: e,
-                    }),
+                    Err(e) => Err(ProcessInputError::FileOpen { path: path.to_owned(), inner: e }),
                 }
             })
             .collect();
@@ -77,13 +72,17 @@ impl ArMerger {
             ArchiveContents::Elf => Box::new(CommonArBuilder::new(output.as_ref())),
             ArchiveContents::MachO => Box::new(MacArBuilder::new(output.as_ref())),
             ArchiveContents::Other => {
-                error!("Input archives contain neither ELF nor Mach-O files, trying to continue with your host toolchain");
+                error!(
+                    "Input archives contain neither ELF nor Mach-O files, trying to continue with your host toolchain"
+                );
                 arbuilder::host_platform_builder(output.as_ref())
-            }
+            },
             ArchiveContents::Mixed => {
-                error!("Input archives contain different object file formats, trying to continue with your host toolchain");
+                error!(
+                    "Input archives contain different object file formats, trying to continue with your host toolchain"
+                );
                 arbuilder::host_platform_builder(output.as_ref())
-            }
+            },
         })
     }
 
@@ -114,7 +113,7 @@ impl ArMerger {
         self,
         keep_or_remove: ArmergeKeepOrRemove,
         symbols_regexes: Iter,
-        object_order: impl IntoIterator<Item = String>
+        object_order: impl IntoIterator<Item = String>,
     ) -> Result<(), MergeError> {
         objects::merge(
             self.builder,
@@ -122,7 +121,7 @@ impl ArMerger {
             self.extracted.object_dir,
             keep_or_remove,
             symbols_regexes.into_iter().collect(),
-            object_order.into_iter().enumerate().map(|(i, s)| (s, i)).collect()
+            object_order.into_iter().enumerate().map(|(i, s)| (s, i)).collect(),
         )
     }
 }
