@@ -5,8 +5,8 @@ use crate::MergeError::ExternalToolLaunchError;
 use crate::{MergeError, ProcessInputError};
 use ar::Archive;
 use goblin::{peek_bytes, Hint};
-use rand::distributions::{Alphanumeric, DistString};
-use rand::thread_rng;
+use rand::distr::{Alphanumeric, SampleString};
+use rand::rng;
 use rayon::prelude::*;
 use std::ffi::OsString;
 use std::fmt::{Debug, Formatter};
@@ -91,7 +91,7 @@ pub fn extract_objects<I: IntoParallelIterator<Item = InputLibrary<R>>, R: Read>
                             inner: e,
                         })?;
 
-                    let rnd: String = Alphanumeric.sample_string(&mut thread_rng(), 8);
+                    let rnd: String = Alphanumeric.sample_string(&mut rng(), 8);
                     let mut obj_path = dir.path().to_owned();
                     obj_path.push(format!(
                         "{}@{}.{}.o",
